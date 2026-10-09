@@ -158,3 +158,60 @@ describe('buildTimelineLayout: single row (input preview)', () => {
     expect(layout.gap).toBeNull()
   })
 })
+
+describe('buildTimelineLayout: overlay row (comparison)', () => {
+  function overlayFor(a: TimeRange, b: TimeRange, view: TimeRange = FULL) {
+    return buildTimelineLayout({
+      view,
+      width: WIDTH,
+      rows: [
+        { label: 'A', range: a, variant: 'a' },
+        { label: 'B', range: b, variant: 'b' },
+      ],
+      comparison: compareRanges(a, b, MAX),
+      overlay: true,
+    })
+  }
+
+  it('is absent unless requested', () => {
+    expect(layoutFor({ start: 0, end: 300 }, { start: 900, end: 1800 }).overlay).toBeNull()
+  })
+
+  it('draws both ranges with the same x coordinates as their own rows', () => {
+    const layout = overlayFor({ start: 0, end: 300 }, { start: 900, end: 1800 })
+    expect(layout.overlay).not.toBeNull()
+    const overlay = layout.overlay!
+    for (const [index, bar] of overlay.bars.entries()) {
+      expect(bar.x1).toBe(layout.bars[index].x1)
+      expect(bar.x2).toBe(layout.bars[index].x2)
+      expect(bar.barY).toBe(overlay.barY)
+    }
+    // 重ね合わせの段は2本の帯より下、軸より上
+    expect(overlay.barY).toBeGreaterThan(layout.bars[1].barY + layout.bars[1].barHeight)
+    expect(layout.axisY).toBeGreaterThan(overlay.barY + overlay.barHeight)
+  })
+
+  it('places the gap arrow on the overlay row without changing its length', () => {
+    const layout = overlayFor({ start: 0, end: 300 }, { start: 900, end: 1800 })
+    expect(layout.gap?.x1).toBeCloseTo(xOf(300))
+    expect(layout.gap?.x2).toBeCloseTo(xOf(900))
+    expect(layout.gap?.y).toBe(layout.overlay!.barY + layout.overlay!.barHeight / 2)
+  })
+
+  it('extends the common highlight down to the overlay row', () => {
+    const layout = overlayFor({ start: 0, end: 900 }, { start: 180, end: 1800 })
+    expect(layout.intersection?.x1).toBeCloseTo(xOf(180))
+    expect(layout.intersection?.x2).toBeCloseTo(xOf(900))
+    expect(layout.intersection!.bottom).toBeGreaterThan(layout.overlay!.barY + layout.overlay!.barHeight)
+  })
+
+  it('keeps a one-point touch as a point and zero-length ranges as points', () => {
+    const touch = overlayFor({ start: 0, end: 300 }, { start: 300, end: 900 })
+    expect(touch.intersection?.isPoint).toBe(true)
+    expect(touch.intersection!.x2 - touch.intersection!.x1).toBe(0)
+
+    const zero = overlayFor({ start: 300, end: 300 }, { start: 0, end: 600 })
+    expect(zero.overlay!.bars[0].isPoint).toBe(true)
+    expect(zero.overlay!.bars[0].x2 - zero.overlay!.bars[0].x1).toBe(0)
+  })
+})

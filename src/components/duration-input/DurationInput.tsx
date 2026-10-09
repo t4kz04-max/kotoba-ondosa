@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useState, type CSSProperties } from 'react'
 import { formatDuration } from '../../domain/format'
 import type { Seconds } from '../../domain/types'
 import {
@@ -12,6 +12,8 @@ import {
 
 interface DurationInputProps {
   readonly label: string
+  /** ラベルの補足（例：「範囲の始まり」） */
+  readonly hint?: string
   /** null は未入力。NaN は数字以外が入力された状態 */
   readonly value: Seconds | null
   readonly onChange: (value: Seconds | null) => void
@@ -20,6 +22,12 @@ interface DurationInputProps {
   /** スライダーの刻み（大まかな調整用） */
   readonly stepSeconds: Seconds
   readonly describedBy?: string
+  /** 色の系統。A（あなた・Aさん）・B（Bさん）・どちらでもない */
+  readonly tone?: 'a' | 'b' | 'neutral'
+  /** この欄の値に問題があるとき true（枠を強調し、aria-invalid を付ける） */
+  readonly invalid?: boolean
+  /** 「0分にする」ボタンを出す（スライダーの初期位置と同じ 0 を選びやすくするため） */
+  readonly zeroShortcut?: boolean
 }
 
 /**
@@ -28,19 +36,24 @@ interface DurationInputProps {
  */
 export function DurationInput({
   label,
+  hint,
   value,
   onChange,
   maxSeconds,
   sliderMin,
   stepSeconds,
   describedBy,
+  tone = 'neutral',
+  invalid = false,
+  zeroShortcut = false,
 }: DurationInputProps) {
   const id = useId()
   const units = unitsFor(maxSeconds)
   const [fields, setFields] = useState<FieldTexts>(() => secondsToFields(value, units))
   const isSet = value !== null && Number.isFinite(value)
+  const isNotNumber = value !== null && !Number.isFinite(value)
 
-  const handleSlider = (seconds: Seconds) => {
+  const setFromSlider = (seconds: Seconds) => {
     setFields(secondsToFields(seconds, units))
     onChange(seconds)
   }
@@ -52,18 +65,25 @@ export function DurationInput({
   }
 
   const sliderValue = isSet ? Math.min(Math.max(value, sliderMin), maxSeconds) : sliderMin
+  // スライダーの塗り（つまみより左側）の割合。未入力なら塗らない
+  const fill = isSet ? ((sliderValue - sliderMin) / (maxSeconds - sliderMin)) * 100 : 0
+  const classes = ['duration', `duration--${tone}`, isSet ? '' : 'duration--unset', invalid ? 'duration--invalid' : '']
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <fieldset className={isSet ? 'duration' : 'duration duration--unset'}>
+    <fieldset className={classes}>
       <legend className="duration__legend">
-        {label}
-        <span className="duration__value" aria-hidden="true">
-          {isSet ? formatDuration(value) : '未選択'}
-        </span>
+        <span className="duration__label">{label}</span>
+        {hint !== undefined && <span className="duration__hint">{hint}</span>}
       </legend>
+      <p className="duration__value" aria-hidden="true">
+        {isSet ? formatDuration(value) : isNotNumber ? '数字を確認' : '未選択'}
+      </p>
       <input
         type="range"
         className="duration__slider"
+        style={{ '--fill': `${fill}%` } as CSSProperties}
         min={sliderMin}
         max={maxSeconds}
         step={stepSeconds}
@@ -71,8 +91,12 @@ export function DurationInput({
         aria-label={`${label}（スライダー）`}
         aria-valuetext={isSet ? formatDuration(value) : '未選択'}
         aria-describedby={describedBy}
-        onChange={(event) => handleSlider(Number(event.target.value))}
+        onChange={(event) => setFromSlider(Number(event.target.value))}
       />
+      <div className="duration__scale" aria-hidden="true">
+        <span>{formatDuration(sliderMin)}</span>
+        <span>{formatDuration(maxSeconds)}</span>
+      </div>
       <div className="duration__fields">
         {units.map((unit) => (
           <label key={unit} className="duration__field" htmlFor={`${id}-${unit}`}>
@@ -83,13 +107,21 @@ export function DurationInput({
               autoComplete="off"
               className="duration__number"
               value={fields[unit] ?? ''}
+              placeholder="—"
               aria-label={`${label}の${UNIT_LABELS[unit]}`}
               aria-describedby={describedBy}
+              aria-invalid={invalid || undefined}
               onChange={(event) => handleField(unit, event.target.value)}
             />
             <span aria-hidden="true">{UNIT_LABELS[unit]}</span>
           </label>
         ))}
+        {/* 押した後も消さない（フォーカスを失わないため） */}
+        {zeroShortcut && (
+          <button type="button" className="button button--ghost button--small duration__zero" onClick={() => setFromSlider(0)}>
+            0分にする
+          </button>
+        )}
       </div>
     </fieldset>
   )

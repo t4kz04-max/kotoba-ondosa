@@ -16,12 +16,14 @@ function App() {
   return (
     <div className="app">
       <AppHeader showReset={state.step !== 'HOME'} onReset={reset} />
-      <ProgressSteps step={state.step} />
-      <main>
-        <ErrorBoundary onReset={reset}>
-          <SessionScreens state={state} dispatch={dispatch} catalog={defaultCatalog} />
-        </ErrorBoundary>
-      </main>
+      <div className="app__body">
+        <ProgressSteps step={state.step} />
+        <main>
+          <ErrorBoundary onReset={reset}>
+            <SessionScreens state={state} dispatch={dispatch} catalog={defaultCatalog} />
+          </ErrorBoundary>
+        </main>
+      </div>
     </div>
   )
 }

@@ -14,18 +14,21 @@ const STEP_INDEX: Record<SessionStep, number | null> = {
   COMPLETE: 3,
 }
 
+function itemClass(index: number, current: number): string {
+  if (index === current) return 'progress__item progress__item--current'
+  if (index < current) return 'progress__item progress__item--done'
+  return 'progress__item'
+}
+
 export function ProgressSteps({ step }: { readonly step: SessionStep }) {
   const current = STEP_INDEX[step]
   if (current === null) return null
   return (
-    <nav aria-label="進み具合">
+    <nav aria-label="進み具合" className="progress-nav">
       <ol className="progress">
         {LABELS.map((label, index) => (
-          <li
-            key={label}
-            className={index === current ? 'progress__item progress__item--current' : 'progress__item'}
-            aria-current={index === current ? 'step' : undefined}
-          >
+          <li key={label} className={itemClass(index, current)} aria-current={index === current ? 'step' : undefined}>
+            <span className="progress__dot" aria-hidden="true" />
             {label}
           </li>
         ))}

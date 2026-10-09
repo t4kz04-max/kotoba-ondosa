@@ -4,9 +4,15 @@ import type { ComparisonResult, TimeRange } from '../../domain/types'
 
 export const PLOT_PADDING_X = 20
 export const MIN_CHART_WIDTH = 240
-const FIRST_BAR_Y = 24
-const ROW_GAP = 60
-const BAR_HEIGHT = 18
+/** 1段目の帯の上端。帯の上には名前と範囲の文字を置く */
+export const FIRST_BAR_Y = 30
+/** 段と段の間隔（帯の上端どうしの距離） */
+const ROW_GAP = 56
+export const BAR_HEIGHT = 20
+/** 重ね合わせの段の帯の高さ */
+const OVERLAY_BAR_HEIGHT = 26
+/** 帯の上端から、その段の文字のベースラインまでの距離 */
+const LABEL_OFFSET = 9
 /** 目盛り1本あたりのおおよその幅（px） */
 const TICK_SPACING = 72
 /** これより細い帯は全体表示では見えにくいので拡大表示を案内する（px） */
@@ -24,6 +30,11 @@ export interface TimelineLayoutInput {
   readonly width: number
   readonly rows: readonly TimelineRowInput[]
   readonly comparison?: ComparisonResult | null
+  /**
+   * true のとき、各段の下に「重ね合わせ」の段を加え、2人の範囲を同じ高さに重ねて描く。
+   * 座標は上の段と同じ scale で計算する（位置・幅は変えない）。
+   */
+  readonly overlay?: boolean
 }
 
 export interface TimelineBar {
@@ -39,6 +50,14 @@ export interface TimelineBar {
   readonly isPoint: boolean
   readonly clippedAtStart: boolean
   readonly clippedAtEnd: boolean
+}
+
+/** 重ね合わせの段。bars は各段の帯と同じ x 座標で、y だけが異なる */
+export interface TimelineOverlay {
+  readonly labelY: number
+  readonly barY: number
+  readonly barHeight: number
+  readonly bars: readonly TimelineBar[]
 }
 
 export interface TimelineMark {
@@ -65,6 +84,8 @@ export interface TimelineLayout {
   readonly axisY: number
   readonly ticks: readonly { readonly x: number; readonly label: string }[]
   readonly bars: readonly TimelineBar[]
+  /** 重ね合わせの段（overlay: true のときだけ） */
+  readonly overlay: TimelineOverlay | null
   readonly intersection: TimelineMark | null
   readonly gap: TimelineGap | null
   /** 見えにくいほど細い帯があるか（拡大表示の案内に使う） */
@@ -87,7 +108,9 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
 
   const rowCount = Math.max(input.rows.length, 1)
   const lastBarBottom = FIRST_BAR_Y + (rowCount - 1) * ROW_GAP + BAR_HEIGHT
-  const axisY = lastBarBottom + 18
+  const overlayBarY = FIRST_BAR_Y + rowCount * ROW_GAP + 6
+  const contentBottom = input.overlay === true ? overlayBarY + OVERLAY_BAR_HEIGHT : lastBarBottom
+  const axisY = contentBottom + 18
   const height = axisY + 28
 
   const maxTicks = Math.max(2, Math.floor((plotRight - plotLeft) / TICK_SPACING) + 1)
@@ -96,15 +119,14 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
     label: formatDuration(seconds),
   }))
 
-  const bars: TimelineBar[] = input.rows.map((row, index) => {
-    const barY = FIRST_BAR_Y + index * ROW_GAP
+  const barAt = (row: TimelineRowInput, barY: number, barHeight: number): TimelineBar => {
     const projected = projectRange(scale, row.range)
     return {
       label: row.label,
       variant: row.variant,
-      labelY: barY - 6,
+      labelY: barY - LABEL_OFFSET,
       barY,
-      barHeight: BAR_HEIGHT,
+      barHeight,
       visible: projected !== null,
       x1: projected?.startCoordinate ?? 0,
       x2: projected?.endCoordinate ?? 0,
@@ -112,7 +134,18 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
       clippedAtStart: projected?.clippedAtStart ?? false,
       clippedAtEnd: projected?.clippedAtEnd ?? false,
     }
-  })
+  }
+
+  const bars = input.rows.map((row, index) => barAt(row, FIRST_BAR_Y + index * ROW_GAP, BAR_HEIGHT))
+  const overlay: TimelineOverlay | null =
+    input.overlay === true
+      ? {
+          labelY: overlayBarY - LABEL_OFFSET,
+          barY: overlayBarY,
+          barHeight: OVERLAY_BAR_HEIGHT,
+          bars: input.rows.map((row) => barAt(row, overlayBarY, OVERLAY_BAR_HEIGHT)),
+        }
+      : null
 
   let intersection: TimelineMark | null = null
   const common = input.comparison?.intersection ?? null
@@ -124,7 +157,7 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
         x2: projected.endCoordinate,
         isPoint: common.start === common.end,
         top: FIRST_BAR_Y - 4,
-        bottom: lastBarBottom + 4,
+        bottom: contentBottom + 4,
       }
     }
   }
@@ -143,7 +176,11 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
       gap = {
         x1,
         x2,
-        y: FIRST_BAR_Y + BAR_HEIGHT + (ROW_GAP - BAR_HEIGHT) / 2,
+        // 重ね合わせの段があればその中央、なければ2本の帯のあいだ
+        y:
+          overlay !== null
+            ? overlay.barY + overlay.barHeight / 2
+            : FIRST_BAR_Y + BAR_HEIGHT + (ROW_GAP - BAR_HEIGHT) / 2,
         label: `${formatDuration(input.comparison.gapLength)}のひらき`,
         labelX: clamp((x1 + x2) / 2, plotLeft + 48, plotRight - 48),
       }
@@ -152,5 +189,5 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
 
   const hasTinyBar = bars.some((bar) => bar.visible && !bar.isPoint && bar.x2 - bar.x1 < TINY_BAR_WIDTH)
 
-  return { width, height, plotLeft, plotRight, axisY, ticks, bars, intersection, gap, hasTinyBar }
+  return { width, height, plotLeft, plotRight, axisY, ticks, bars, overlay, intersection, gap, hasTinyBar }
 }

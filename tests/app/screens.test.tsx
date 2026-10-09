@@ -94,6 +94,19 @@ describe('input screen', () => {
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>これで決定<\/button>/)
   })
 
+  it('offers an explicit way to choose 0', () => {
+    expect(textOf(render(atInput))).toContain('0分にする')
+  })
+
+  it('shows an empty preview before the range is chosen', () => {
+    expect(textOf(render(atInput))).toContain('まだ範囲を選んでいません')
+  })
+
+  it('marks the reversed fields as invalid', () => {
+    const html = render(run([...SOLO_COMPARISON.slice(0, 2), { type: 'SET_DRAFT', draft: { start: 600, end: 300 } }]))
+    expect(html.match(/aria-invalid="true"/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('states that the max is not the limit of the meaning', () => {
     expect(textOf(render(atInput))).toContain('より長いと感じる人もいます')
   })
@@ -121,6 +134,12 @@ describe('duo mode hides answers before the reveal', () => {
     expect(text).not.toContain('共通')
   })
 
+  it('READY_TO_REVEAL is the waiting state of the reveal', () => {
+    const text = textOf(render(run(DUO_B_DONE)))
+    expect(text).toContain('2人の答えがそろいました')
+    expect(text).toContain('2人の感覚を公開する')
+  })
+
   it('shows both answers after the reveal', () => {
     const text = textOf(render(run([...DUO_B_DONE, { type: 'REVEAL' }])))
     expect(text).toContain('Aさんの範囲')
@@ -144,6 +163,38 @@ describe('comparison screen', () => {
     expect(text).not.toContain('多数')
   })
 
+  it('shows the three layers: each answer and the overlay with the gap', () => {
+    const html = render(run(SOLO_COMPARISON))
+    const text = textOf(html)
+    expect(text).toContain('重ねると')
+    expect(text).toContain('10分のひらき')
+    expect(html).toContain('timeline__row--a')
+    expect(html).toContain('timeline__row--b')
+    expect(html).toContain('timeline__overlay')
+  })
+
+  it('plays the reveal animation on first display', () => {
+    // 新しい回答オブジェクトなので、初回表示として演出用のクラスが付く
+    const html = render(run(SOLO_COMPARISON))
+    expect(html).toContain('timeline--reveal')
+    expect(html).toMatch(/class="screen screen--comparison reveal"/)
+  })
+
+  it('describes a one-point touch as a point', () => {
+    const text = textOf(
+      render(
+        run([
+          { type: 'SELECT_MODE', mode: 'solo' },
+          { type: 'SELECT_SCENARIO', scenarioId: 'sugu-iku' },
+          { type: 'SET_DRAFT', draft: { start: 300, end: 900 } },
+          { type: 'SUBMIT_ANSWER' },
+        ]),
+      ),
+    )
+    expect(text).toContain('1点だけで重なっています')
+    expect(text).toContain('共通 15分（1点だけ）')
+  })
+
   it('renders an accessible SVG chart', () => {
     const html = render(run(SOLO_COMPARISON))
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="2人の「すぐ行く」は重なりませんでした/)
@@ -156,9 +207,32 @@ describe('agreement screen', () => {
   it('starts with no time selected and no approval controls', () => {
     const text = textOf(render(run(atAgreement)))
     expect(text).toContain('時間を選ぶと、ここに言葉ができます。')
-    expect(text).toContain('あなたの範囲の終わり：5分')
-    expect(text).toContain('ソラ（架空）の範囲の終わり：30分')
+    expect(text).toContain('あなたの範囲の終わり 5分')
+    expect(text).toContain('ソラ（架空）の範囲の終わり 30分')
     expect(text).not.toContain('この言葉にする')
+  })
+
+  it('does not offer a common-range candidate when the ranges do not overlap', () => {
+    const text = textOf(render(run(atAgreement)))
+    expect(text).toContain('共通範囲からの手がかりはありません')
+    expect(text).not.toContain('共通範囲の終わり')
+  })
+
+  it('offers the common-range candidate only when there is a common range', () => {
+    // あなた 10分〜20分、ソラ（架空）15分〜30分 → 共通 15分〜20分
+    const text = textOf(
+      render(
+        run([
+          { type: 'SELECT_MODE', mode: 'solo' },
+          { type: 'SELECT_SCENARIO', scenarioId: 'sugu-iku' },
+          { type: 'SET_DRAFT', draft: { start: 600, end: 1200 } },
+          { type: 'SUBMIT_ANSWER' },
+          { type: 'START_AGREEMENT' },
+        ]),
+      ),
+    )
+    expect(text).toContain('共通範囲の終わり 20分')
+    expect(text).not.toContain('共通範囲からの手がかりはありません')
   })
 
   it('shows the sentence and the feasibility check after a time is chosen', () => {
@@ -208,6 +282,10 @@ describe('complete screen', () => {
     expect(text).toContain('ほかの言葉でくらべる')
     expect(text).toContain('この言葉をコピー')
     expect(text).toContain('架空のサンプル')
+    // ひとりモードでは、2人が確認したとは表示しない
+    expect(text).not.toContain('Aさん・Bさんが')
+    expect(text).toContain('曖昧だった言葉')
+    expect(text).toContain('「すぐ行く」')
   })
 
   it('returns to scenario selection after restart', () => {

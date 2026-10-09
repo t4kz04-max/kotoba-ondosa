@@ -39,11 +39,12 @@ src/
 │   ├── AppHeader.tsx                # 作品名・「最初から」
 │   ├── ProgressSteps.tsx            # えらぶ → こたえる → くらべる → ことばにする
 │   ├── ConfirmDialog.tsx            # ネイティブ <dialog> による確認
+│   ├── Icon.tsx                 5A  # 装飾用のインライン SVG アイコン（外部ライブラリなし）
 │   ├── duration-input/
 │   │   ├── DurationInput.tsx        # スライダー＋数値入力（入力画面・具体化画面で共用）
 │   │   └── durationFields.ts        # 数値欄 ⇔ 秒の変換（純粋関数）
 │   └── timeline/
-│       ├── TimelineChart.tsx        # SVG の描画のみ（入力プレビューと比較で共用）
+│       ├── TimelineChart.tsx        # SVG の描画のみ（入力プレビューと比較で共用）。5A で重ね合わせの段・公開演出
 │       ├── ComparisonChart.tsx      # 全体表示／拡大表示の切り替えと表示範囲の明記
 │       └── layout.ts                # 図の座標計算（scale.ts を使う純粋関数）
 ├── features/                        # 画面単位（③）
@@ -57,9 +58,10 @@ src/
 │   └── complete/CompleteScreen.tsx
 ├── hooks/                           # ③
 │   ├── useFocusHeading.ts           # 画面表示時に見出しへフォーカス
-│   └── useElementWidth.ts           # ResizeObserver でコンテナ幅を取得（SVG 用）
+│   ├── useElementWidth.ts           # ResizeObserver でコンテナ幅を取得（SVG 用）
+│   └── useRevealOnce.ts         5A  # 比較結果の公開演出を同じ回答につき1回だけ行う
 └── styles/
-    └── index.css                    # グローバル CSS（MVP の基本スタイルのみ）
+    └── index.css                    # デザインシステム（トークン・部品・画面・図・演出）。仕様は UI_DESIGN_SPEC.md
 
 tests/
 ├── appInfo.test.ts
@@ -114,7 +116,8 @@ tests/
 - 座標計算は `components/timeline/layout.ts` の純粋関数 `buildTimelineLayout(input, width)` に分離し、テストする。返すもの：目盛り、各範囲の帯、共通範囲の強調帯／接点の縦線／空白の矢印。
 - **最小描画幅は使わない**。短い範囲は実際の幅のまま描き、全体表示で 4px 未満の帯があれば（`hasTinyBar`）拡大表示を案内する。長さ0の範囲は幅を持たないひし形のマーカー、1点接触の共通点は縦線と丸で示す。
 - 色は CSS 変数で定義し、SVG は `fill="var(--color-a)"` のように参照する。模様（斜線）は `<pattern>` で定義する。
-- アニメーションは Phase 5。
+- 比較画面では A・B の段の下に「重ね合わせ」の段を加える（`buildTimelineLayout` の `overlay: true`。x 座標は上の段と同じ scale）。
+- 公開演出（Phase 5A）は CSS の `@keyframes` だけで行い、`useRevealOnce` で同じ回答につき1回に限る。`prefers-reduced-motion` では止める。詳細は [UI_DESIGN_SPEC.md](UI_DESIGN_SPEC.md) §7。
 
 ## 6. テスト戦略
 
