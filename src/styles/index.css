@@ -117,6 +117,7 @@ h1,
 h2,
 .promise__text,
 .sentence-card__text,
+.approval__sentence-text,
 .candidate__basis,
 .duration__label,
 .mode-card__title,
@@ -1055,6 +1056,20 @@ h1:focus {
 
 .duration__error:not(:empty)::before {
   content: '！ ';
+}
+
+.duration__interpretation {
+  margin: var(--space-2) 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.duration__interpretation:empty {
+  margin: 0;
+}
+
+.duration__interpretation:not(:empty)::before {
+  content: 'ℹ ';
 }
 
 .duration__zero {
@@ -2166,6 +2181,23 @@ h1:focus {
 
   .segmented__button {
     padding: 0.35rem 0.6rem;
+  }
+}
+
+/* ===== 高さの低いスマートフォン（320×568 など） =====
+ * 画面下に固定したボタンの帯を薄くし、図や入力欄を覆う面積を減らす（タップ領域は 44px 以上を保つ）
+ */
+
+@media (max-height: 640px) and (max-width: 599px) {
+  .action-bar {
+    padding-top: var(--space-2);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .action-bar .button--large {
+    min-height: var(--tap);
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fieldsToSeconds, secondsToFields, unitsFor } from '../../src/components/duration-input/durationFields'
+import { carriesOver, fieldsToSeconds, secondsToFields, unitsFor } from '../../src/components/duration-input/durationFields'
 
 describe('unitsFor', () => {
   it('uses hours and minutes only for ranges longer than an hour', () => {
@@ -51,5 +51,28 @@ describe('fieldsToSeconds', () => {
     for (const seconds of [0, 10, 59, 60, 61, 1800, 3600]) {
       expect(fieldsToSeconds(secondsToFields(seconds, units), units)).toBe(seconds)
     }
+  })
+})
+
+describe('carriesOver (「3分75秒」のような入力の解釈を知らせる)', () => {
+  const minSec = ['minute', 'second'] as const
+  const hourMin = ['hour', 'minute'] as const
+
+  it('detects seconds >= 60 and minutes >= 60 in the lower field', () => {
+    expect(carriesOver({ minute: '3', second: '75' }, minSec)).toBe(true)
+    expect(carriesOver({ minute: '', second: '60' }, minSec)).toBe(true)
+    expect(carriesOver({ hour: '1', minute: '90' }, hourMin)).toBe(true)
+    expect(carriesOver({ hour: '', minute: '６０' }, hourMin)).toBe(true)
+  })
+
+  it('does not flag normal values, the upper field, empty or invalid text', () => {
+    expect(carriesOver({ minute: '75', second: '59' }, minSec)).toBe(false)
+    expect(carriesOver({ minute: '3', second: '' }, minSec)).toBe(false)
+    expect(carriesOver({ minute: '3', second: 'x' }, minSec)).toBe(false)
+    expect(carriesOver({ hour: '13', minute: '59' }, hourMin)).toBe(false)
+  })
+
+  it('agrees with fieldsToSeconds (3分75秒 = 4分15秒)', () => {
+    expect(fieldsToSeconds({ minute: '3', second: '75' }, minSec)).toBe(255)
   })
 })

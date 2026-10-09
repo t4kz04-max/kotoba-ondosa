@@ -3,6 +3,7 @@ import { formatDuration } from '../../domain/format'
 import type { TimelineVariant } from '../timeline/layout'
 import type { Seconds } from '../../domain/types'
 import {
+  carriesOver,
   fieldsToSeconds,
   secondsToFields,
   UNIT_LABELS,
@@ -57,6 +58,11 @@ export function DurationInput({
   const isSet = value !== null && Number.isFinite(value)
   const isNotNumber = value !== null && !Number.isFinite(value)
   const errorId = `${id}-error`
+  // 「3分75秒」のようにくり上がる入力は、どう解釈したかを欄のすぐ下で知らせる
+  const interpretation =
+    isSet && error === undefined && carriesOver(fields, units)
+      ? `${units.map((unit) => `${fields[unit] === '' || fields[unit] === undefined ? '0' : fields[unit]}${UNIT_LABELS[unit]}`).join('')}は、${formatDuration(value)}として扱います。`
+      : null
   const describedByAll = [error !== undefined ? errorId : undefined, describedBy].filter(Boolean).join(' ') || undefined
 
   const setFromSlider = (seconds: Seconds) => {
@@ -131,6 +137,9 @@ export function DurationInput({
       </div>
       <p id={errorId} className="duration__error" aria-live="polite">
         {error}
+      </p>
+      <p className="duration__interpretation" aria-live="polite">
+        {interpretation}
       </p>
     </fieldset>
   )

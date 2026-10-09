@@ -15,10 +15,11 @@ export const SCENARIOS: readonly Scenario[] = [
     maxSeconds: 60 * 60,
     inputStepSeconds: 60,
     // 終点は「友だちが着く」なので、文も到着を表す（「行く」は出発とも読めるため Phase 6B で修正）
-    agreementTemplate: '{time}以内に着くね',
-    agreementWhen: '{time}以内',
+    // 起点（メッセージが届いた＝送った瞬間）を「今から」で文に入れる。コピーした文だけでも伝わるように（Phase 7）
+    agreementTemplate: '今から{time}以内に着くね',
+    agreementWhen: '今から{time}以内',
     agreementAction: '着く',
-    feasibilityTemplate: '{time}以内に、本当に着けそう？',
+    feasibilityTemplate: '今から{time}以内に、本当に着けそう？',
   },
   {
     id: 'chotto-matte',
@@ -30,10 +31,10 @@ export const SCENARIOS: readonly Scenario[] = [
     maxSeconds: 30 * 60,
     inputStepSeconds: 10,
     // 終点は「呼んだ人のところへ行く」。文に何をするかを入れる（Phase 6B）
-    agreementTemplate: '{time}以内にそっちへ行くね',
-    agreementWhen: '{time}以内',
+    agreementTemplate: '今から{time}以内にそっちへ行くね',
+    agreementWhen: '今から{time}以内',
     agreementAction: 'そっちへ行く',
-    feasibilityTemplate: '{time}以内に、本当に行けそう？',
+    feasibilityTemplate: '今から{time}以内に、本当に行けそう？',
   },
   {
     id: 'atode-yaru',
@@ -45,9 +46,9 @@ export const SCENARIOS: readonly Scenario[] = [
     maxSeconds: 12 * 60 * 60,
     inputStepSeconds: 5 * 60,
     // 終点は「宿題を始める」。何を始めるかを文に入れる（Phase 6B）
-    agreementTemplate: '{time}以内に宿題を始めるね',
-    agreementWhen: '{time}以内',
+    agreementTemplate: '今から{time}以内に宿題を始めるね',
+    agreementWhen: '今から{time}以内',
     agreementAction: '宿題を始める',
-    feasibilityTemplate: '{time}以内に、本当に宿題を始められそう？',
+    feasibilityTemplate: '今から{time}以内に、本当に宿題を始められそう？',
   },
 ]

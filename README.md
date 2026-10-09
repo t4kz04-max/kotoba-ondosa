@@ -12,7 +12,7 @@
 3. 共通点と違いを可視化する
 4. 曖昧な表現を、お互いに確認した具体的な表現へ変換する
 
-> **現在の状態：Phase 6B（具体化と確認の強化）**
+> **現在の状態：Phase 7（品質保証・リリース候補版）**
 > ひとりモード・ふたりモードに加えて、同じ「すぐ」を3つの場面で答えて自分の中の違いを見る「場面を変えて比べる」を体験できます（[docs/PRD.md](docs/PRD.md) §16）。比較のあとは「いつ・何をする」が伝わる具体的な文に言い換え、ふたりモードでは2人が同じ文を確認したときだけ「約束」になります（§15b）。Gemini Canvas の試作（Phase 4）を参考にしたデザインと比較結果の公開演出を実装し、スマートフォンでの操作性を調整しています。デザインの方針は [docs/UI_DESIGN_SPEC.md](docs/UI_DESIGN_SPEC.md) を参照してください。
 > 仕様は [docs/PRD.md](docs/PRD.md) ほか docs/ 内の文書、開発の進め方は [docs/ROADMAP.md](docs/ROADMAP.md) を参照してください。
 
@@ -31,8 +31,23 @@
 Node.js（v20.19以上、または v22.12以上を推奨。開発時は v24 で確認）と npm が必要です。
 
 ```bash
-npm install
+npm ci        # package-lock.json のとおりに依存をインストール（初回・提出物の確認用）
 ```
+
+### Windows（PowerShell）での手順
+
+```powershell
+cd <このフォルダ>
+npm ci
+npm run build
+npm run preview
+```
+
+表示された URL（通常は http://localhost:4173/ ）をブラウザで開きます。
+
+- 「このシステムではスクリプトの実行が無効になっているため…」と表示される場合は、`npm` の代わりに `npm.cmd` を使ってください（例：`npm.cmd ci`）。
+- `dist/index.html` をダブルクリックして直接開く（file://）方法では動きません。`npm run preview` などの Web サーバーで開いてください。
+- ビルド結果は相対パスで出力されるので、`dist/` フォルダの中身をそのまま任意の Web サーバー（サブフォルダでも可）に置けます。
 
 ## 開発サーバーの起動
 
@@ -57,6 +72,14 @@ npm run test:watch # ファイル変更を監視してテストを実行
 npm run typecheck  # TypeScript の型チェック
 npm run lint       # oxlint による静的チェック
 ```
+
+## 提出用 ZIP に含めないもの
+
+`node_modules/`、`dist/`（必要な場合のみ別に同梱）、`.env` などの環境ファイル、`.git/`。リリース前の確認項目は [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) を参照してください。
+
+## プライバシー
+
+回答はブラウザのメモリ上だけで扱い、保存（localStorage・Cookie など）も送信もしません。外部のフォント・スクリプト・解析サービスも読み込みません（Phase 7 で、操作中の通信がすべて配信元のサーバーだけであることを確認）。
 
 ## ディレクトリ構成
 

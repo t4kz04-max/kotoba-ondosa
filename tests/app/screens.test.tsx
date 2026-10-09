@@ -145,6 +145,18 @@ describe('duo mode hides answers before the reveal', () => {
     expect(text).toContain('2人の感覚を公開する')
   })
 
+  it.each([
+    ['HANDOFF', DUO_A_DONE],
+    ['INPUT_B', [...DUO_A_DONE, { type: 'START_INPUT_B' }] as SessionEvent[]],
+    ['READY_TO_REVEAL', DUO_B_DONE],
+  ])('%s does not leak A in attributes or hidden text either (raw HTML)', (_, events) => {
+    // aria-label・aria-valuetext・value などの属性や、見えない読み上げ用の文も含めて確認する
+    const html = render(run(events))
+    for (const leak of ['7分', '13分', '20分', '40分', '420', '780', '1200', '2400']) {
+      expect(html).not.toContain(leak)
+    }
+  })
+
   it('shows both answers after the reveal', () => {
     const text = textOf(render(run([...DUO_B_DONE, { type: 'REVEAL' }])))
     expect(text).toContain('Aさんの範囲')
@@ -258,10 +270,10 @@ describe('agreement screen', () => {
   it('shows the sentence and the feasibility check after a time is chosen', () => {
     const html = render(run([...atAgreement, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 }]))
     const text = textOf(html)
-    expect(text).toContain('「10分以内に着くね」')
-    expect(text).toContain('いつ 10分以内')
+    expect(text).toContain('「今から10分以内に着くね」')
+    expect(text).toContain('いつ 今から10分以内')
     expect(text).toContain('何をする 着く')
-    expect(text).toContain('「10分以内」は、メッセージが届いたときから数えた時間です。')
+    expect(text).toContain('「今から」は、メッセージが届いたときのことです。')
     expect(text).toContain('10分以内に、本当に着けそう？')
     expect(text).toContain('この言葉のとおりに、実際にできる（待てる）')
     expect(text).toContain('相手が了承したことにはなりません')
@@ -288,7 +300,7 @@ describe('agreement screen', () => {
     expect(approvedState.step).toBe('AGREEMENT')
     const approvedA = textOf(render(approvedState))
     expect(approvedA).toContain('2人で同じ言葉を確かめよう')
-    expect(approvedA).toContain('確かめる言葉 「15分以内に着くね」')
+    expect(approvedA).toContain('確かめる言葉 「今から15分以内に着くね」')
     expect(approvedA).toContain('Aさん：確認しました')
     expect(approvedA).toContain('取り消す')
     expect(approvedA).toContain('Bさん：まだ確認していません')
@@ -320,7 +332,7 @@ describe('agreement screen', () => {
     expect(text).toContain('ことばが、約束になった。')
     expect(text).toContain('2人で確かめた具体的な言葉')
     expect(text).toContain('Aさん・Bさんが、同じ言葉を確認しました。')
-    expect(text).toContain('いつ 15分以内')
+    expect(text).toContain('いつ 今から15分以内')
   })
 })
 
@@ -339,11 +351,11 @@ describe('complete screen', () => {
     expect(text).toContain('具体的な言い方を考えられた。')
     expect(text).not.toContain('約束になった')
     expect(text).toContain('あなたが考えた具体的な言い方')
-    expect(text).toContain('「 10分以内に着くね 」')
-    expect(text).toContain('いつ 10分以内')
+    expect(text).toContain('「 今から10分以内に着くね 」')
+    expect(text).toContain('いつ 今から10分以内')
     expect(text).toContain('何をする 着く')
     // コピーされる文（promise__sentence）は、かぎかっこを含まない画面上の文そのもの
-    expect(html).toContain('<span class="promise__sentence">10分以内に着くね</span>')
+    expect(html).toContain('<span class="promise__sentence">今から10分以内に着くね</span>')
     expect(text).toContain('最初から')
     expect(text).toContain('ほかの言葉でくらべる')
     expect(text).toContain('この言葉をコピー')

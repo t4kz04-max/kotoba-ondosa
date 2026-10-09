@@ -35,7 +35,10 @@ export interface Scenario {
    * 文が表す時点は、比較で答えた範囲の終点（endpointLabel）と同じにする（Phase 6B）
    */
   readonly agreementTemplate: string
-  /** 完成した文のうち「いつ」の部分。{time} を置換する。agreementTemplate にそのまま含まれていること */
+  /**
+   * 完成した文のうち「いつ」の部分。{time} を置換する。agreementTemplate にそのまま含まれていること。
+   * 起点（originLabel の瞬間）を「今から」で表し、文だけを読んでも「いつからの時間か」が分かるようにする
+   */
   readonly agreementWhen: string
   /** 完成した文のうち「何をする」の部分。agreementTemplate にそのまま含まれていること */
   readonly agreementAction: string

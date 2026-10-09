@@ -109,9 +109,7 @@ function SentencePreview({ scenario, agreement }: { readonly scenario: Scenario;
           <dd>{agreement.parts.action}</dd>
         </div>
       </dl>
-      <p className="note sentence-card__origin">
-        「{agreement.parts.when}」は、{scenario.originLabel}ときから数えた時間です。
-      </p>
+      <p className="note sentence-card__origin">「今から」は、{scenario.originLabel}ときのことです。</p>
     </div>
   )
 }
@@ -142,7 +140,7 @@ function ApprovalPanel({ agreement, mode, onApprove, onWithdraw, onRevise }: App
       <p className="note">
         {mode === 'solo'
           ? '「そう感じる時間」と「本当にできる時間」は別です。この言葉のとおりにできると思えたら、チェックしてください。'
-          : '「そう感じる時間」と「本当にできる時間」は別です。言う人は「この言葉のとおりにできるか」、聞く人は「この言葉のとおりなら待てるか」を考えて、2人ともチェックしてください。'}
+          : '「そう感じる時間」と「本当にできる時間」は別です。言う人は「できるか」、聞く人は「待てるか」を考えて、2人ともチェックしてください。'}
       </p>
       {mode === 'solo' && (
         <p className="note">今回の相手は架空のサンプルなので、確認するのはあなただけです。相手が了承したことにはなりません。</p>

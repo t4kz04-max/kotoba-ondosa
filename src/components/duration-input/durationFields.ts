@@ -35,6 +35,19 @@ function normalizeDigits(text: string): string {
 }
 
 /**
+ * 下の単位の欄が、上の単位にくり上がる値か（例：「分・秒」の秒が60以上、「時間・分」の分が60以上）。
+ * fieldsToSeconds はくり上げて計算するので、画面で解釈した結果を知らせるために使う。
+ */
+export function carriesOver(fields: FieldTexts, units: readonly DurationUnit[]): boolean {
+  return units.slice(1).some((unit, index) => {
+    const text = normalizeDigits(fields[unit] ?? '')
+    if (!/^\d+$/.test(text)) return false
+    const upper = units[index]
+    return Number(text) * UNIT_SECONDS[unit] >= UNIT_SECONDS[upper]
+  })
+}
+
+/**
  * 入力欄の文字列を秒にする。
  * - すべて空欄 → null（未入力）
  * - 数字以外を含む → NaN（validateDraft が 'not-integer' として扱う）
