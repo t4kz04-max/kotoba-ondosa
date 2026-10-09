@@ -19,6 +19,10 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
   const headingRef = useFocusHeading()
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const text = agreement.text ?? ''
+  // 「約束」と呼ぶのは、ふたりモードで2人とも同じ言葉を確認したときだけ。
+  // ひとりモードの相手は架空のサンプルなので、合意したようには表示しない
+  const promised =
+    mode === 'duo' && agreement.requiredApprovers.every((participant) => agreement.approvedBy.includes(participant))
   const textRef = useRef<HTMLSpanElement>(null)
 
   /** 失敗したときは、自分でコピーできるように文を選んだ状態にする */
@@ -45,7 +49,7 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
     <section className="screen screen--complete">
       <div className="promise">
         <h1 ref={headingRef} tabIndex={-1} className="promise__title">
-          ことばが、約束になった。
+          {promised ? 'ことばが、約束になった。' : '具体的な言い方を考えられた。'}
         </h1>
         <div className="promise__change">
           <p className="promise__label">曖昧だった言葉</p>
@@ -53,7 +57,7 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
           <p className="promise__arrow" aria-hidden="true">
             ↓
           </p>
-          <p className="promise__label">{mode === 'duo' ? '2人で具体化した言葉' : 'あなたが具体化した言葉'}</p>
+          <p className="promise__label">{promised ? '2人で確かめた具体的な言葉' : 'あなたが考えた具体的な言い方'}</p>
           <p className="promise__text">
             <span aria-hidden="true">「</span>
             <span ref={textRef} className="promise__sentence">
@@ -61,15 +65,27 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
             </span>
             <span aria-hidden="true">」</span>
           </p>
+          {agreement.parts !== null && (
+            <dl className="sentence-parts sentence-parts--dark">
+              <div className="sentence-parts__item">
+                <dt>いつ</dt>
+                <dd>{agreement.parts.when}</dd>
+              </div>
+              <div className="sentence-parts__item">
+                <dt>何をする</dt>
+                <dd>{agreement.parts.action}</dd>
+              </div>
+            </dl>
+          )}
         </div>
-        {mode === 'duo' ? (
+        {promised ? (
           <p className="promise__confirmed">
             <Icon name="check" size={18} />
-            Aさん・Bさんが、この時間でできることを確認しました。
+            Aさん・Bさんが、同じ言葉を確認しました。
           </p>
         ) : (
           <p className="fictional-note">
-            今回の相手は架空のサンプルです。この時間でできるか確かめたのは、あなただけです。本当の相手と使うときは、相手にも確認しよう。
+            今回の相手は架空のサンプルです。この言葉のとおりにできるか確かめたのは、あなただけです。本当の相手と使うときは、相手にも確認しよう。
           </p>
         )}
         <div className="promise__copy">

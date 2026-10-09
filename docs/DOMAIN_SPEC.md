@@ -251,13 +251,26 @@ computeZoomView(ranges: TimeRange[], maxSeconds): TimeRange
 
 ### 7.4 文の生成
 
-| ID | agreementTemplate（例：600秒） | feasibilityTemplate（例：600秒） |
-|---|---|---|
-| `sugu-iku` | 10分以内に行くね | 10分以内に、本当に着けそう？ |
-| `chotto-matte` | 10分だけ待ってて | 10分で、本当に行けそう？ |
-| `atode-yaru` | 10分以内に始めるね | 10分以内に、本当に始められそう？ |
+| ID | 終点（入力した時間の意味） | agreementTemplate（例：600秒） | いつ（agreementWhen） | 何をする（agreementAction） | feasibilityTemplate（例：600秒） |
+|---|---|---|---|---|---|
+| `sugu-iku` | 友だちが着く | 10分以内に着くね | 10分以内 | 着く | 10分以内に、本当に着けそう？ |
+| `chotto-matte` | 呼んだ人のところへ行く | 10分以内にそっちへ行くね | 10分以内 | そっちへ行く | 10分以内に、本当に行けそう？ |
+| `atode-yaru` | 宿題を始める | 10分以内に宿題を始めるね | 10分以内 | 宿題を始める | 10分以内に、本当に宿題を始められそう？ |
 
-`buildAgreementText`・`buildFeasibilityQuestion` が `{time}` を `formatDuration` の結果で置換する。
+- `buildAgreementText`・`buildFeasibilityQuestion`・`buildAgreementParts` が `{time}` を `formatDuration` の結果で置換する。
+- **完成文の意味**：比較で答えた範囲は「起点 → 終点」の時間なので、完成文も終点と同じ時点（到着・行く・宿題を始める）を「◯以内」で約束する形にする。時間は起点（メッセージが届いた／言った／答えた）から数える。起点は文に含まれないため、画面では部品と分けて注記する。
+- `buildAgreementParts` は完成文を「いつ」「何をする」に分ける。どちらも文にそのまま含まれる語だけで、文にない情報を足さない（テストで確認）。
+
+#### Phase 6B の変更（理由と影響範囲）
+
+| 変更前 | 変更後 | 理由 |
+|---|---|---|
+| すぐ行く「10分以内に行くね」 | 「10分以内に着くね」 | 終点は「友だちが着く」（到着）。「行く」は出発とも読め、答えた時間と意味がずれる |
+| ちょっと待って「10分だけ待ってて」 | 「10分以内にそっちへ行くね」 | 文に「何をするか」がなかった。終点（呼んだ人のところへ行く）を文に入れる |
+| ちょっと待って「10分で、本当に行けそう？」 | 「10分以内に、本当に行けそう？」 | 完成文（以内）と形をそろえる |
+| あとでやる「10分以内に始めるね」 | 「10分以内に宿題を始めるね」 | 何を始めるかを文に入れる |
+
+影響範囲：`src/data/scenarios.ts`（文型と、新しい `agreementWhen`・`agreementAction`）、`Scenario` 型、`AgreementView.parts`、具体化・完了画面の表示、関連テスト。比較の計算・候補（`agreementCandidates`）・入力の検証は変えていない。
 
 ---
 
@@ -327,6 +340,15 @@ interface SessionState {
 
 - COMPARISON からの BACK は拒否する（入力画面へは戻らない）。やり直しは RESTART_SAME_MODE または RESET。
 - 表にない組み合わせはすべて **拒否** する。
+
+### 8.3b 確認の取り消し（Phase 6B）
+
+| イベント | 条件 | 結果 |
+|---|---|---|
+| `WITHDRAW_APPROVAL { participant }` | step が `AGREEMENT` で、その人が確認済み | その人を `approvedBy` から外す。選んだ時間はそのまま。確認していない人は `not-approved` で拒否 |
+
+- 完了（`COMPLETE`）は、これまでどおり必要な全員（ふたりモードは A と B）が確認したときだけ。
+- 時間を変える（`CHOOSE_AGREEMENT_TIME`）・選びなおす（`REVISE_AGREEMENT`）と、確認はすべてリセットされる（変更なし）。
 
 ### 8.4 拒否の扱い
 

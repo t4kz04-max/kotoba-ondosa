@@ -99,6 +99,11 @@ describe('context result', () => {
     expect(text).toContain('③ すぐ始める')
     expect(text).toContain('もう一度試す')
     expect(text).toContain('スタートに戻る')
+    // Phase 6B：具体化への橋渡しの一文（3場面の比較・図は変えない）
+    expect(text).toContain('場面が変われば、具体的に伝える内容（何分以内に、何をするか）も変わります。')
+    // 「場面を変えて比べる」には具体化・確認・約束の表示はない
+    expect(text).not.toContain('約束')
+    expect(text).not.toContain('確認しました')
   })
 
   it('identical answers: says they were the same, not different', () => {

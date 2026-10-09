@@ -40,9 +40,25 @@ export function isValidAgreementSeconds(seconds: Seconds, maxSeconds: Seconds): 
   return Number.isInteger(seconds) && seconds >= 1 && seconds <= maxSeconds
 }
 
-/** 例：「10分以内に行くね」 */
+/** 例：「10分以内に着くね」 */
 export function buildAgreementText(scenario: Scenario, seconds: Seconds): string {
   return scenario.agreementTemplate.replace('{time}', formatDuration(seconds))
+}
+
+/** 完成した文の「いつ」と「何をする」。どちらも文にそのまま含まれる部分だけ */
+export interface AgreementParts {
+  /** 例：「10分以内」 */
+  readonly when: string
+  /** 例：「着く」 */
+  readonly action: string
+}
+
+/** 完成した文を「いつ」「何をする」に分ける（文に含まれない情報は足さない） */
+export function buildAgreementParts(scenario: Scenario, seconds: Seconds): AgreementParts {
+  return {
+    when: scenario.agreementWhen.replace('{time}', formatDuration(seconds)),
+    action: scenario.agreementAction,
+  }
 }
 
 /** 例：「10分以内に、本当に着けそう？」 */

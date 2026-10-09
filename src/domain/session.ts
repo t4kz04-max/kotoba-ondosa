@@ -57,6 +57,8 @@ export type SessionEvent =
       /** 「この時間で実際にできる」と本人が確認したか */
       readonly feasibilityConfirmed: boolean
     }
+  /** 確認を取り消す（その時間ではむずかしいと分かったときなど）。時間の選択はそのまま */
+  | { readonly type: 'WITHDRAW_APPROVAL'; readonly participant: ParticipantId }
   | { readonly type: 'REVISE_AGREEMENT' }
   | { readonly type: 'BACK' }
   | { readonly type: 'RESTART_SAME_MODE' }
@@ -72,6 +74,7 @@ export type TransitionError =
   | 'feasibility-not-confirmed'
   | 'invalid-participant'
   | 'already-approved'
+  | 'not-approved'
 
 export type TransitionResult =
   | { readonly ok: true; readonly state: SessionState }
@@ -231,6 +234,15 @@ export function transition(
         ...state,
         step: complete ? 'COMPLETE' : 'AGREEMENT',
         agreement: { ...state.agreement, approvedBy },
+      })
+    }
+
+    case 'WITHDRAW_APPROVAL': {
+      if (state.step !== 'AGREEMENT') return invalid()
+      if (!state.agreement.approvedBy.includes(event.participant)) return reject(state, 'not-approved')
+      return ok({
+        ...state,
+        agreement: { ...state.agreement, approvedBy: state.agreement.approvedBy.filter((p) => p !== event.participant) },
       })
     }
 

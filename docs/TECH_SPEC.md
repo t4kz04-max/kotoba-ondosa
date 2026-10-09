@@ -106,6 +106,7 @@ tests/
 - 状態遷移は `src/domain/session.ts` の純粋関数 `transition` で行う。不正な遷移は拒否され、state は変わらない。
 - `useReducer` には `createSessionReducer(catalog)` を使う。拒否時は同じ state オブジェクトが返るため再描画されない。開発時に拒否理由を確認したい場合は `transition` を直接呼ぶ。
 - 比較結果・説明文・候補は state に保存せず、`views.ts` の関数で描画時に計算する（派生値）。
+- Phase 6B：具体化の確認の取り消し（`WITHDRAW_APPROVAL`）を `SessionEvent` に追加した。完成文の「いつ・何をする」は `buildAgreementParts`（domain）で作り、`selectAgreementView` の `parts` として画面に渡す。
 - 「場面を変えて比べる」（Phase 6A）は別の `ContextState`（`src/domain/contextSession.ts`）を `App` のもう1つの `useReducer` で持つ。どちらの体験を表示するかは `App` の `experience`（'compare' | 'context'）で切り替え、既存の `SessionState` と遷移は変更しない。「最初から」は両方をリセットする。
 - 状態管理ライブラリ、ルーターは使わない。
   - ルーターを使わない理由：URL で画面を直接開けると、ふたりモードで相手の回答が見える経路ができるため。

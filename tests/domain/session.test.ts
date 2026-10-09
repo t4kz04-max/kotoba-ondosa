@@ -312,3 +312,54 @@ describe('createSessionReducer', () => {
     expect(reducer(initialSessionState, { type: 'SELECT_MODE', mode: 'solo' }).step).toBe('SCENARIO_SELECT')
   })
 })
+
+describe('withdrawing an approval (Phase 6B)', () => {
+  const duoChosen: SessionEvent[] = [
+    { type: 'SELECT_MODE', mode: 'duo' },
+    { type: 'SELECT_SCENARIO', scenarioId: 'sugu-iku' },
+    { type: 'SET_DRAFT', draft: { start: 0, end: 300 } },
+    { type: 'SUBMIT_ANSWER' },
+    { type: 'START_INPUT_B' },
+    { type: 'SET_DRAFT', draft: { start: 600, end: 900 } },
+    { type: 'SUBMIT_ANSWER' },
+    { type: 'REVEAL' },
+    { type: 'START_AGREEMENT' },
+    { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 },
+  ]
+  const apply = (events: SessionEvent[]) =>
+    events.reduce((state, event) => transition(state, event, catalog).state, initialSessionState)
+
+  it('removes only that participant and keeps the chosen time', () => {
+    const state = apply([
+      ...duoChosen,
+      { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
+      { type: 'WITHDRAW_APPROVAL', participant: 'A' },
+    ])
+    expect(state.step).toBe('AGREEMENT')
+    expect(state.agreement).toEqual({ seconds: 600, approvedBy: [] })
+  })
+
+  it('rejects withdrawing when not approved, or outside the agreement step', () => {
+    const chosen = apply(duoChosen)
+    expect(transition(chosen, { type: 'WITHDRAW_APPROVAL', participant: 'B' }, catalog)).toMatchObject({
+      ok: false,
+      error: 'not-approved',
+    })
+    expect(transition(initialSessionState, { type: 'WITHDRAW_APPROVAL', participant: 'A' }, catalog).ok).toBe(false)
+  })
+
+  it('cannot complete with only one approval, even after withdraw and re-approve', () => {
+    const state = apply([
+      ...duoChosen,
+      { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
+      { type: 'WITHDRAW_APPROVAL', participant: 'A' },
+      { type: 'APPROVE_AGREEMENT', participant: 'B', feasibilityConfirmed: true },
+    ])
+    expect(state.step).toBe('AGREEMENT')
+    expect(apply([
+      ...duoChosen,
+      { type: 'APPROVE_AGREEMENT', participant: 'B', feasibilityConfirmed: true },
+      { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
+    ]).step).toBe('COMPLETE')
+  })
+})

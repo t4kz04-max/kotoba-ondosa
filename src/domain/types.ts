@@ -30,8 +30,15 @@ export interface Scenario {
   readonly maxSeconds: Seconds
   /** スライダー・数値入力の刻み */
   readonly inputStepSeconds: Seconds
-  /** 具体化の文型。{time} を時間表現で置換する */
+  /**
+   * 具体化の文型。{time} を時間表現で置換する。
+   * 文が表す時点は、比較で答えた範囲の終点（endpointLabel）と同じにする（Phase 6B）
+   */
   readonly agreementTemplate: string
+  /** 完成した文のうち「いつ」の部分。{time} を置換する。agreementTemplate にそのまま含まれていること */
+  readonly agreementWhen: string
+  /** 完成した文のうち「何をする」の部分。agreementTemplate にそのまま含まれていること */
+  readonly agreementAction: string
   /** 実行できるかを確認する問い。{time} を時間表現で置換する */
   readonly feasibilityTemplate: string
 }

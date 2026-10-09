@@ -223,9 +223,11 @@ describe('agreement screen', () => {
   it('starts with no time selected and no approval controls', () => {
     const text = textOf(render(run(atAgreement)))
     expect(text).toContain('時間を選ぶと、ここに言葉ができます。')
-    expect(text).toContain('あなたの範囲の終わり 5分')
-    expect(text).toContain('ソラ（架空）の範囲の終わり 30分')
-    expect(text).not.toContain('この言葉にする')
+    expect(text).toContain('あなたが選んだ範囲の終わり 5分 あなたの 0分〜5分 の、いちばん遅い時間')
+    expect(text).toContain('ソラ（架空）が選んだ範囲の終わり 30分 ソラ（架空）の 15分〜30分 の、いちばん遅い時間')
+    expect(text).toContain('感じ方が違っていても、実際にできる時間を話し合って決められます。')
+    expect(text).toContain('範囲が重なっていなくても、話し合えば決められます。')
+    expect(text).not.toContain('この言い方にする')
   })
 
   it('does not offer a common-range candidate when the ranges do not overlap', () => {
@@ -247,18 +249,31 @@ describe('agreement screen', () => {
         ]),
       ),
     )
-    expect(text).toContain('共通範囲の終わり 20分')
+    expect(text).toContain('2人に共通する範囲の終わり 20分 2人とも当てはまると感じた 15分〜20分 の、いちばん遅い時間')
     expect(text).not.toContain('共通範囲からの手がかりはありません')
+    // 重なっていても、それだけで約束にはしない
+    expect(text).toContain('範囲が重なっていても、それだけで約束になるわけではありません。')
   })
 
   it('shows the sentence and the feasibility check after a time is chosen', () => {
     const html = render(run([...atAgreement, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 }]))
     const text = textOf(html)
-    expect(text).toContain('10分以内に行くね')
+    expect(text).toContain('「10分以内に着くね」')
+    expect(text).toContain('いつ 10分以内')
+    expect(text).toContain('何をする 着く')
+    expect(text).toContain('「10分以内」は、メッセージが届いたときから数えた時間です。')
     expect(text).toContain('10分以内に、本当に着けそう？')
-    expect(text).toContain('この時間で、実際にできる（待てる）')
+    expect(text).toContain('この言葉のとおりに、実際にできる（待てる）')
+    expect(text).toContain('相手が了承したことにはなりません')
+    expect(text).toContain('時間を選びなおす')
     // チェックするまで承認ボタンは押せない
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>この言葉にする<\/button>/)
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>この言い方にする<\/button>/)
+  })
+
+  it('accepts a free-input time that is not a candidate', () => {
+    const text = textOf(render(run([...atAgreement, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 7 * 60 }])))
+    expect(text).toContain('7分以内に着くね')
+    expect(text).toContain('7分以内に、本当に着けそう？')
   })
 
   it('requires both A and B in duo mode, and resets approval when the time changes', () => {
@@ -269,14 +284,43 @@ describe('agreement screen', () => {
       { type: 'CHOOSE_AGREEMENT_TIME', seconds: 900 },
       { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
     ]
-    const approvedA = textOf(render(run(duoAgreement)))
+    const approvedState = run(duoAgreement)
+    expect(approvedState.step).toBe('AGREEMENT')
+    const approvedA = textOf(render(approvedState))
+    expect(approvedA).toContain('2人で同じ言葉を確かめよう')
+    expect(approvedA).toContain('確かめる言葉 「15分以内に着くね」')
     expect(approvedA).toContain('Aさん：確認しました')
+    expect(approvedA).toContain('取り消す')
+    expect(approvedA).toContain('Bさん：まだ確認していません')
     expect(approvedA).toContain('Bさん OK')
+    // 片方だけでは完了しない
+    expect(approvedA).toContain('Bさんの確認を待っています。2人がそろうと完成します。')
 
     const changed = textOf(render(run([...duoAgreement, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 1200 }])))
     expect(changed).not.toContain('確認しました')
     expect(changed).toContain('Aさん OK')
-    expect(changed).toContain('20分以内に行くね')
+    expect(changed).toContain('20分以内に着くね')
+
+    const withdrawn = textOf(render(run([...duoAgreement, { type: 'WITHDRAW_APPROVAL', participant: 'A' }])))
+    expect(withdrawn).toContain('Aさん：まだ確認していません')
+    expect(withdrawn).toContain('15分以内に着くね')
+  })
+
+  it('completes only when both A and B confirm the same sentence, and only then calls it a promise', () => {
+    const both = run([
+      ...DUO_B_DONE,
+      { type: 'REVEAL' },
+      { type: 'START_AGREEMENT' },
+      { type: 'CHOOSE_AGREEMENT_TIME', seconds: 900 },
+      { type: 'APPROVE_AGREEMENT', participant: 'B', feasibilityConfirmed: true },
+      { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
+    ])
+    expect(both.step).toBe('COMPLETE')
+    const text = textOf(render(both))
+    expect(text).toContain('ことばが、約束になった。')
+    expect(text).toContain('2人で確かめた具体的な言葉')
+    expect(text).toContain('Aさん・Bさんが、同じ言葉を確認しました。')
+    expect(text).toContain('いつ 15分以内')
   })
 })
 
@@ -291,10 +335,15 @@ describe('complete screen', () => {
       ]),
     )
     const text = textOf(html)
-    expect(text).toContain('ことばが、約束になった。')
-    expect(text).toContain('「 10分以内に行くね 」')
+    // ひとりモードは架空の相手なので「約束」とは言わない
+    expect(text).toContain('具体的な言い方を考えられた。')
+    expect(text).not.toContain('約束になった')
+    expect(text).toContain('あなたが考えた具体的な言い方')
+    expect(text).toContain('「 10分以内に着くね 」')
+    expect(text).toContain('いつ 10分以内')
+    expect(text).toContain('何をする 着く')
     // コピーされる文（promise__sentence）は、かぎかっこを含まない画面上の文そのもの
-    expect(html).toContain('<span class="promise__sentence">10分以内に行くね</span>')
+    expect(html).toContain('<span class="promise__sentence">10分以内に着くね</span>')
     expect(text).toContain('最初から')
     expect(text).toContain('ほかの言葉でくらべる')
     expect(text).toContain('この言葉をコピー')

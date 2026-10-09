@@ -1,7 +1,9 @@
 import {
   agreementCandidates,
+  buildAgreementParts,
   buildAgreementText,
   buildFeasibilityQuestion,
+  type AgreementParts,
 } from './agreement'
 import { describeComparison, type LabeledRange } from './describe'
 import { formatSampleLabel } from './format'
@@ -103,8 +105,10 @@ export function selectComparisonView(
 
 export interface AgreementView {
   readonly seconds: Seconds | null
-  /** 例：「10分以内に行くね」。時間未選択なら null */
+  /** 例：「10分以内に着くね」。時間未選択なら null */
   readonly text: string | null
+  /** 文の「いつ」「何をする」。時間未選択なら null */
+  readonly parts: AgreementParts | null
   /** 例：「10分以内に、本当に着けそう？」。時間未選択なら null */
   readonly feasibilityQuestion: string | null
   readonly approvedBy: readonly ParticipantId[]
@@ -122,6 +126,7 @@ export function selectAgreementView(
   return {
     seconds,
     text: seconds === null ? null : buildAgreementText(scenario, seconds),
+    parts: seconds === null ? null : buildAgreementParts(scenario, seconds),
     feasibilityQuestion: seconds === null ? null : buildFeasibilityQuestion(scenario, seconds),
     approvedBy,
     requiredApprovers: requiredApprovers(state.mode),

@@ -67,6 +67,7 @@ export function ContextResultScreen({ scenes, settings, onRetry, onHome }: Conte
       </div>
 
       <p className="prompt">{description.prompt}</p>
+      <p className="note">場面が変われば、具体的に伝える内容（何分以内に、何をするか）も変わります。</p>
 
       <div className="button-stack">
         <button type="button" className="button button--primary button--large" onClick={onRetry}>

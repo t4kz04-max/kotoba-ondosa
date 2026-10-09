@@ -102,12 +102,14 @@ describe('selectAgreementView', () => {
     expect(selectAgreementView(run(base), catalog)).toEqual({
       seconds: null,
       text: null,
+      parts: null,
       feasibilityQuestion: null,
       approvedBy: [],
       requiredApprovers: ['A'],
     })
     const chosen = selectAgreementView(run([...base, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 }]), catalog)
-    expect(chosen?.text).toBe('10分以内に行くね')
+    expect(chosen?.text).toBe('10分以内に着くね')
+    expect(chosen?.parts).toEqual({ when: '10分以内', action: '着く' })
     expect(chosen?.feasibilityQuestion).toBe('10分以内に、本当に着けそう？')
   })
 })

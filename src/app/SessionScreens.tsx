@@ -101,6 +101,7 @@ export function SessionScreens({ state, dispatch, catalog, onStartContext }: Ses
           onApprove={(participant, feasibilityConfirmed) =>
             dispatch({ type: 'APPROVE_AGREEMENT', participant, feasibilityConfirmed })
           }
+          onWithdraw={(participant) => dispatch({ type: 'WITHDRAW_APPROVAL', participant })}
           onRevise={() => dispatch({ type: 'REVISE_AGREEMENT' })}
           onBack={() => dispatch({ type: 'BACK' })}
           onRestartSameMode={() => dispatch({ type: 'RESTART_SAME_MODE' })}

@@ -14,7 +14,10 @@ export const SCENARIOS: readonly Scenario[] = [
     endpointLabel: '友だちが着く',
     maxSeconds: 60 * 60,
     inputStepSeconds: 60,
-    agreementTemplate: '{time}以内に行くね',
+    // 終点は「友だちが着く」なので、文も到着を表す（「行く」は出発とも読めるため Phase 6B で修正）
+    agreementTemplate: '{time}以内に着くね',
+    agreementWhen: '{time}以内',
+    agreementAction: '着く',
     feasibilityTemplate: '{time}以内に、本当に着けそう？',
   },
   {
@@ -26,8 +29,11 @@ export const SCENARIOS: readonly Scenario[] = [
     endpointLabel: '呼んだ人のところへ行く',
     maxSeconds: 30 * 60,
     inputStepSeconds: 10,
-    agreementTemplate: '{time}だけ待ってて',
-    feasibilityTemplate: '{time}で、本当に行けそう？',
+    // 終点は「呼んだ人のところへ行く」。文に何をするかを入れる（Phase 6B）
+    agreementTemplate: '{time}以内にそっちへ行くね',
+    agreementWhen: '{time}以内',
+    agreementAction: 'そっちへ行く',
+    feasibilityTemplate: '{time}以内に、本当に行けそう？',
   },
   {
     id: 'atode-yaru',
@@ -38,7 +44,10 @@ export const SCENARIOS: readonly Scenario[] = [
     endpointLabel: '宿題を始める',
     maxSeconds: 12 * 60 * 60,
     inputStepSeconds: 5 * 60,
-    agreementTemplate: '{time}以内に始めるね',
-    feasibilityTemplate: '{time}以内に、本当に始められそう？',
+    // 終点は「宿題を始める」。何を始めるかを文に入れる（Phase 6B）
+    agreementTemplate: '{time}以内に宿題を始めるね',
+    agreementWhen: '{time}以内',
+    agreementAction: '宿題を始める',
+    feasibilityTemplate: '{time}以内に、本当に宿題を始められそう？',
   },
 ]
