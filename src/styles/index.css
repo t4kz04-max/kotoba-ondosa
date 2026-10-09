@@ -1,0 +1,21 @@
+:root {
+  font-family: system-ui, 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  line-height: 1.6;
+  color: #222;
+  background-color: #fff;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.app__note {
+  color: #666;
+  font-size: 0.875rem;
+}
