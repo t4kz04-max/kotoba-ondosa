@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeZoomView,
   coordinateToTime,
   createLinearScale,
+  MIN_ZOOM_SPAN,
+  ZOOM_PADDING_RATIO,
   generateTicks,
   projectRange,
   timeToCoordinate,
@@ -97,6 +100,60 @@ describe('projectRange', () => {
     const p = projectRange(zoomed, { start: 900, end: 900 })
     expect(p?.startCoordinate).toBe(300)
     expect(p?.endCoordinate).toBe(300)
+  })
+})
+
+describe('computeZoomView', () => {
+  const contains = (view: { start: number; end: number }, start: number, end: number) =>
+    view.start <= start && end <= view.end
+
+  it('fits both ranges with padding inside the full range', () => {
+    const view = computeZoomView([{ start: 10, end: 30 }, { start: 60, end: 120 }], 1800)
+    expect(contains(view, 10, 120)).toBe(true)
+    expect(view.start).toBeGreaterThanOrEqual(0)
+    expect(view.end).toBeLessThanOrEqual(1800)
+    expect(view.end - view.start).toBeLessThan(1800)
+    expect(Number.isInteger(view.start) && Number.isInteger(view.end)).toBe(true)
+  })
+
+  it('applies padding of ZOOM_PADDING_RATIO on both sides when not clamped', () => {
+    // 範囲 600〜1200（600秒）→ 余白 90秒ずつ → 510〜1290
+    expect(computeZoomView([{ start: 600, end: 900 }, { start: 1000, end: 1200 }], 3600)).toEqual({
+      start: 600 - 600 * ZOOM_PADDING_RATIO,
+      end: 1200 + 600 * ZOOM_PADDING_RATIO,
+    })
+  })
+
+  it('shifts the window instead of going below 0 or above the max', () => {
+    expect(computeZoomView([{ start: 0, end: 60 }], 3600)).toEqual({ start: 0, end: 78 })
+    expect(computeZoomView([{ start: 3540, end: 3600 }], 3600)).toEqual({ start: 3522, end: 3600 })
+  })
+
+  it('uses the minimum span for points and very short ranges', () => {
+    const view = computeZoomView([{ start: 300, end: 300 }, { start: 300, end: 300 }], 1800)
+    expect(view.end - view.start).toBe(MIN_ZOOM_SPAN)
+    expect(contains(view, 300, 300)).toBe(true)
+  })
+
+  it('returns the full range when zooming would not help', () => {
+    expect(computeZoomView([{ start: 0, end: 3000 }, { start: 100, end: 3600 }], 3600)).toEqual({
+      start: 0,
+      end: 3600,
+    })
+  })
+
+  it('keeps the scale linear in the zoomed view', () => {
+    const view = computeZoomView([{ start: 10, end: 30 }, { start: 60, end: 120 }], 1800)
+    const zoomed = createLinearScale(view, { start: 0, end: 500 })
+    const d1 = timeToCoordinate(zoomed, 40) - timeToCoordinate(zoomed, 20)
+    const d2 = timeToCoordinate(zoomed, 100) - timeToCoordinate(zoomed, 80)
+    expect(d1).toBeCloseTo(d2)
+    expect(timeToCoordinate(zoomed, view.start)).toBe(0)
+    expect(timeToCoordinate(zoomed, view.end)).toBe(500)
+  })
+
+  it('rejects an empty list', () => {
+    expect(() => computeZoomView([], 60)).toThrow(RangeError)
   })
 })
 

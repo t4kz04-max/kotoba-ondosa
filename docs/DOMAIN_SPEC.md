@@ -202,7 +202,7 @@ interface ComparisonResult {
 
 - 時間軸は **実際の経過時間に比例する線形軸** とする。
 - 表示範囲（`domain`、秒）と描画座標（`range`、px など）を持つ `LinearScale` を作り、相互に変換する。
-- 表示範囲を変えた scale を作り直すだけで拡大表示に対応できる（ズーム UI は Phase 2・3 では作らない）。
+- 表示範囲を変えた scale を作り直すだけで拡大表示に対応できる。Phase 3 では「全体表示」と「拡大表示」の2つを切り替える（任意の倍率のズーム UI は作らない）。
 
 ```ts
 createLinearScale(domain: {start, end}, range: {start, end}): LinearScale
@@ -210,6 +210,7 @@ timeToCoordinate(scale, seconds, { clamp? }): number
 coordinateToTime(scale, coordinate, { clamp?, round? }): number
 projectRange(scale, range: TimeRange): ProjectedRange | null
 generateTicks(view: TimeRange, maxTicks: number): Seconds[]
+computeZoomView(ranges: TimeRange[], maxSeconds): TimeRange
 ```
 
 | 関数 | 仕様 |
@@ -219,6 +220,9 @@ generateTicks(view: TimeRange, maxTicks: number): Seconds[]
 | `coordinateToTime` | 上の逆変換。`clamp` で表示範囲に丸め、`round` で整数秒に四捨五入 |
 | `projectRange` | 範囲を座標に変換し、表示範囲からはみ出した部分を切り取る（`clippedAtStart`・`clippedAtEnd`）。表示範囲と共通点がなければ null。表示範囲の端に接する範囲は残す |
 | `generateTicks` | 目盛りの間隔を候補（1秒〜24時間の「切りのよい」値）から選ぶ。目盛り数が `maxTicks` 以下になる最小の間隔の倍数を、表示範囲内に並べる。間引きは目盛りを減らすだけで、比例関係は変えない |
+| `computeZoomView` | 拡大表示の表示範囲。すべての範囲を含む区間 [最小の start, 最大の end] の長さに、両側 15%（`ZOOM_PADDING_RATIO`）の余白を足す（最小 `MIN_ZOOM_SPAN` = 30秒）。中心をそろえて置き、0 未満・最大値超過になる場合は内側へずらす。結果は整数秒（外側へ切り上げ）。全体より広くなる場合は `[0, maxSeconds]` を返す |
+
+- 短い範囲を見やすくするために、実際の幅より太く描く「最小描画幅」は使わない。代わりに拡大表示を使う。
 
 ---
 
@@ -405,7 +409,7 @@ createSessionReducer(catalog): (state, event) => state   // useReducer 用
 | `tests/domain/format.test.ts` | 時間表示の各形式と丸め、範囲表示、架空ラベル |
 | `tests/domain/describe.test.ts` | 6分類の説明文、禁止語が含まれないこと |
 | `tests/domain/agreement.test.ts` | 候補の生成（0除外・重複統合・妥協点なし）、時間の検証、文型 |
-| `tests/domain/scale.test.ts` | 線形変換の正確性・逆変換・外挿と丸め・表示範囲の変更・切り取り・目盛り |
+| `tests/domain/scale.test.ts` | 線形変換の正確性・逆変換・外挿と丸め・表示範囲の変更・切り取り・目盛り・拡大表示の範囲計算 |
 | `tests/domain/session.test.ts` | 両モードの全体の流れ、未入力回答の確定拒否、不正な遷移、INPUT_B → INPUT_A 不可、実行可能性の確認、リセット・やり直し |
 | `tests/domain/views.test.ts` | B の入力画面に A の回答が含まれないこと、公開前に比較が出ないこと |
 | `tests/data/catalog.test.ts` | シナリオの最大値・刻み、サンプルの件数・有効性・架空フラグ |

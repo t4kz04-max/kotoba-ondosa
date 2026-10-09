@@ -85,6 +85,37 @@ export function projectRange(scale: LinearScale, range: TimeRange): ProjectedRan
   }
 }
 
+/** 拡大表示の最小の幅（秒） */
+export const MIN_ZOOM_SPAN: Seconds = 30
+
+/** 拡大表示で範囲の外側に足す余白（範囲全体の長さに対する割合、片側） */
+export const ZOOM_PADDING_RATIO = 0.15
+
+/**
+ * 拡大表示の表示範囲。すべての範囲が収まり、[0, maxSeconds] の中に入る整数秒の区間を返す。
+ * 範囲全体の長さに余白を足し（最小 MIN_ZOOM_SPAN）、全体より広くなるなら全体表示を返す。
+ * 表示範囲を変えるだけなので、時間と座標の比例関係は保たれる。
+ */
+export function computeZoomView(ranges: readonly TimeRange[], maxSeconds: Seconds): TimeRange {
+  if (ranges.length === 0) throw new RangeError('At least one range is required')
+  const lo = Math.min(...ranges.map((range) => range.start))
+  const hi = Math.max(...ranges.map((range) => range.end))
+  const span = Math.max((hi - lo) * (1 + 2 * ZOOM_PADDING_RATIO), MIN_ZOOM_SPAN)
+  if (span >= maxSeconds) return { start: 0, end: maxSeconds }
+
+  let start = (lo + hi) / 2 - span / 2
+  let end = start + span
+  if (start < 0) {
+    start = 0
+    end = span
+  }
+  if (end > maxSeconds) {
+    end = maxSeconds
+    start = maxSeconds - span
+  }
+  return { start: Math.floor(start), end: Math.ceil(end) }
+}
+
 /** 目盛りの間隔の候補（秒） */
 export const TICK_STEPS: readonly Seconds[] = [
   1, 2, 5, 10, 15, 30,
