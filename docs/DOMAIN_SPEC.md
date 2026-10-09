@@ -2,8 +2,8 @@
 
 # 言葉の温度差：データモデル・計算仕様
 
-この文書は Phase 2（コアロジック実装）の直接の入力となる。
-ここで定義する型・関数はすべて React に依存しない純粋な TypeScript として `src/domain/` に実装する。
+この文書は Phase 2（コアロジック）の仕様であり、`src/domain/` と `src/data/` の実装と一致させる。
+すべて React に依存しない純粋な TypeScript とし、Vitest で単体テストする（`tests/domain/`・`tests/data/`）。
 
 関連文書：[PRD.md](PRD.md) / [UX_SPEC.md](UX_SPEC.md) / [TECH_SPEC.md](TECH_SPEC.md)
 
@@ -14,8 +14,9 @@
 1. 比較は **2つの閉区間の幾何学的な関係** だけを扱う。
 2. 計算結果から「誤解する確率」「すれ違い率」「相性スコア」などを **算出しない・表示しない**。
 3. 回答範囲を確率分布（一様分布など）とみなさない。範囲は「この言葉が当てはまると感じる時間の範囲」というユーザーの申告であり、その内部に重みや分布は仮定しない。
-4. 「重なりがない ＝ 必ず誤解する」「重なりがある ＝ 誤解しない」と断定しない。重なりは「2人が当てはまると感じた時間の範囲に共通部分があるか」を示すだけである。
-5. どちらの回答が正しいかを判定する値・文言を生成しない。
+4. 「重なりがない ＝ 必ず誤解する」「重なりがある ＝ 誤解しない」と断定しない。
+5. どちらの回答が正しいか・普通かを判定する値や文言を生成しない。
+6. **言葉の解釈** と **実際に行動できる時間** を区別する。比較結果から出す時間の候補は解釈の手がかりであり、実行できる約束とみなさない（§7）。
 
 ---
 
@@ -23,479 +24,388 @@
 
 ### 2.1 時間単位
 
-- 内部の時間単位は **秒（整数）** とする。
-- 理由：「ちょっと待って」は秒単位（10秒・30秒）の感覚がありうるため、分単位では表現できない。一方で「あとでやる」は時間単位になるため、表示時に分・時間へ変換する（§9）。
-- 型 `Seconds` は 0 以上の整数（`Number.isInteger`）でなければならない。
+- 内部の時間単位は **整数秒**（型 `Seconds`）。
+- 表示時に秒・分・時間へ変換する（§9.1）。
 
-### 2.2 言葉ごとの起点・終点・最大値（MVP の3語）
+### 2.2 シナリオ（言葉・場面・起点・終点・最大値）
 
-時間範囲は「起点からの経過時間」で表す。各言葉は1つの使用場面と結びつき、起点と終点を場面の文章で明示する。
+実装：`src/data/scenarios.ts`
 
-| ID | 言葉 | 使用場面（画面に表示） | 起点（0秒） | 終点（測る時点） | 最大値 |
-|---|---|---|---|---|---|
-| `sugu-iku` | すぐ行く | 友だちと待ち合わせ中。先に着いたあなたに、友だちから「すぐ行く」とメッセージが来た。 | メッセージが届いた時点 | 友だちが到着する時点 | 60分（3600秒） |
-| `chotto-matte` | ちょっと待って | 家の人に「ちょっと来て」と呼ばれて、「ちょっと待って」と返事をした。 | 「ちょっと待って」と言った時点 | 呼んだ人のところへ行く時点 | 30分（1800秒） |
-| `atode-yaru` | あとでやる | 家の人に「宿題やったの？」と聞かれて、「あとでやる」と答えた。 | 「あとでやる」と答えた時点 | 宿題を **始める** 時点（終わる時点ではない） | 12時間（43200秒） |
+| ID | 言葉 | 使用場面 | 起点（0秒） | 終点（測る時点） | 最大値 | 入力の刻み |
+|---|---|---|---|---|---|---|
+| `sugu-iku` | すぐ行く | 友だちと待ち合わせ中。先に着いたあなたに、友だちから「すぐ行く」とメッセージが来た。 | メッセージが届いた時点 | 友だちが到着する時点 | 60分（3600秒） | 1分 |
+| `chotto-matte` | ちょっと待って | 家の人に「ちょっと来て」と呼ばれて、「ちょっと待って」と返事をした。 | 「ちょっと待って」と言った時点 | 呼んだ人のところへ行く時点 | 30分（1800秒） | 10秒 |
+| `atode-yaru` | あとでやる | 家の人に「宿題やったの？」と聞かれて、「あとでやる」と答えた。 | 「あとでやる」と答えた時点 | 宿題を **始める** 時点 | 12時間（43200秒） | 5分 |
 
-- 「あとでやる」の終点を「始める時点」とする理由：「終わる時点」にすると宿題の量という別の要因が混ざり、言葉の解釈の比較にならないため。
-- 最大値を超える感覚を持つ人がいる可能性は残る。MVP では最大値を範囲の上限とし、UI で「最大値以上」は選べない（要確認事項 D-3）。
+- 「あとでやる」の終点を「始める時点」とするのは、宿題の量という別の要因を混ぜないため。
+- **最大値はアプリで扱う比較範囲の上限であり、言葉の意味の客観的な上限ではない。** 上限を超える解釈もありうることを UI で明記する（UX_SPEC §3）。
+- 入力の刻み（`inputStepSeconds`）は UI のスライダー・数値入力のためのもの。ドメインの比較計算は刻みに依存せず、`[0, maxSeconds]` 内の任意の整数秒で動作する。
 
-### 2.3 目盛り（stops）
-
-各言葉は、選択可能な値の昇順リスト `stops` を持つ。UI の入力値はこのリストの値に限られる。
-
-| ID | stops |
-|---|---|
-| `sugu-iku` | 0, 1分, 2分, 3分, 5分, 10分, 15分, 20分, 30分, 45分, 60分 |
-| `chotto-matte` | 0, 10秒, 30秒, 1分, 2分, 3分, 5分, 10分, 15分, 20分, 30分 |
-| `atode-yaru` | 0, 5分, 10分, 15分, 30分, 1時間, 2時間, 3時間, 4時間, 6時間, 12時間 |
-
-- いずれも 11 点。先頭は必ず 0、末尾は必ず最大値。
-- 時間軸は stops を **等間隔に並べた区分線形スケール**（非線形軸）で描画する（§8）。短い時間の差を細かく、長い時間の差を粗く表示するため。この選択は要確認事項 D-1。
-- ドメイン関数（比較計算）は stops に依存せず、`[0, maxSeconds]` 内の任意の整数秒で正しく動作しなければならない。stops は UI と軸描画のための情報である。
-
-### 2.4 0 を含む場合
+### 2.3 0秒・長さ0の範囲
 
 - 0秒は「起点と同時（ただちに）」を意味し、有効な値である。
-- `start = 0` の範囲は「ただちに〜」を含む。特別扱いはせず、通常の値として計算する。
+- `start === end`（長さ0の範囲）も有効な回答である（「ちょうど5分」）。
 
 ---
 
 ## 3. 型定義
 
-```ts
-/** 0 以上の整数秒 */
-export type Seconds = number
+実装：`src/domain/types.ts`（セッション関連は `src/domain/session.ts`）
 
-/** 閉区間 [start, end]。start <= end。start === end（幅0の「点」）も有効 */
-export interface TimeRange {
-  readonly start: Seconds
-  readonly end: Seconds
-}
+| 型 | 内容 |
+|---|---|
+| `Seconds` | 0 以上の整数秒 |
+| `TimeRange` | 閉区間 `{ start, end }` |
+| `RangeDraft` | 入力途中の範囲 `{ start: Seconds \| null, end: Seconds \| null }`。null は未入力 |
+| `ScenarioId` | `'sugu-iku' \| 'chotto-matte' \| 'atode-yaru'` |
+| `Scenario` | id, phrase, scene, question, originLabel, endpointLabel, maxSeconds, inputStepSeconds, agreementTemplate, feasibilityTemplate |
+| `ParticipantId` | `'A' \| 'B'` |
+| `Mode` | `'solo' \| 'duo'` |
+| `SampleAnswer` | 架空のサンプル回答。sampleId, name, scenarioId, range, note, `fictional: true` |
+| `RangeRelation` | 6種類の関係（§5.4） |
+| `ComparisonResult` | 比較結果（§5.5） |
+| `ComparisonDescription` | 説明文 `{ headline, details, prompt }`（§9.2） |
+| `AgreementCandidate` | 具体化の候補 `{ seconds, basis }`（§7.2） |
 
-export type ExpressionId = 'sugu-iku' | 'chotto-matte' | 'atode-yaru'
-
-/** 言葉と使用場面（MVPでは1語につき1場面） */
-export interface Expression {
-  readonly id: ExpressionId
-  /** 例：「すぐ行く」 */
-  readonly phrase: string
-  /** 場面の説明文 */
-  readonly scene: string
-  /** 入力画面の問い。例：「メッセージが来てから友だちが着くまで…」 */
-  readonly question: string
-  /** 起点の説明。例：「メッセージが届いたとき」 */
-  readonly originLabel: string
-  /** 終点の説明。例：「友だちが着くとき」 */
-  readonly endpointLabel: string
-  readonly maxSeconds: Seconds
-  /** 昇順・重複なし・先頭0・末尾maxSeconds */
-  readonly stops: readonly Seconds[]
-  /** 具体化の文型。{time} を時間表現で置換する。例：「{time}以内に行くね」 */
-  readonly clarifyTemplate: string
-}
-
-export type ParticipantId = 'A' | 'B'
-
-/** 回答者。ひとりモードの比較相手は架空のサンプル */
-export type Respondent =
-  | { readonly kind: 'person'; readonly id: ParticipantId; readonly label: string }
-  | { readonly kind: 'sample'; readonly sampleId: string; readonly label: string }
-
-/** 1人分の回答 */
-export interface Answer {
-  readonly respondent: Respondent
-  readonly expressionId: ExpressionId
-  readonly range: TimeRange
-}
-
-/** 架空のサンプル回答（ひとりモード用）。実在の人物・統計ではない */
-export interface SampleAnswer {
-  readonly sampleId: string
-  /** 名前のみ（例：「ソラ」）。画面では formatSampleLabel で「ソラ（架空）」として表示する */
-  readonly name: string
-  readonly expressionId: ExpressionId
-  readonly range: TimeRange
-  /** サンプルの人物設定の一言（任意） */
-  readonly note?: string
-  readonly fictional: true
-}
-
-/** 2区間の関係 */
-export type RangeRelation =
-  | 'identical'      // 完全に一致
-  | 'a-contains-b'   // A が B を包含（一致を除く）
-  | 'b-contains-a'   // B が A を包含（一致を除く）
-  | 'overlap'        // 共通範囲が幅 > 0（包含を除く）
-  | 'touch'          // 共通部分がちょうど1点（包含を除く）
-  | 'gap'            // 共通部分なし
-
-export interface ComparisonResult {
-  readonly relation: RangeRelation
-  /** 共通範囲。共通部分がなければ null。touch や点を含む包含では幅0の区間 */
-  readonly intersection: TimeRange | null
-  /** 共通範囲の長さ（秒）。共通部分なしは 0 */
-  readonly intersectionLength: Seconds
-  /** 区間の空白（秒）。共通部分があれば 0 */
-  readonly gapLength: Seconds
-  /** 各範囲の中心値（秒。0.5秒単位になりうる） */
-  readonly midpointA: number
-  readonly midpointB: number
-  /** 中心値の差の絶対値（秒。0.5秒単位になりうる） */
-  readonly midpointDifference: number
-  /** 中心値が大きいのはどちらか（同じなら 'same'） */
-  readonly laterMidpoint: ParticipantId | 'same'
-}
-
-/** 言い換え（具体化）結果 */
-export interface Clarification {
-  readonly expressionId: ExpressionId
-  /** 双方が話し合って選んだ時間 */
-  readonly seconds: Seconds
-  /** 生成された具体的な文。例：「10分以内に行くね」 */
-  readonly text: string
-  /** 確認済みの人。ふたりモードでは A と B の両方がそろって完了 */
-  readonly confirmedBy: readonly ParticipantId[]
-}
-```
-
-比較関数は回答の順序を A（1人目／あなた）、B（2人目／サンプル）として扱う。ひとりモードでは「あなた」を A、サンプルを B とする。
+ひとりモードでは「あなた」を A、架空サンプルを B として比較する。
 
 ---
 
 ## 4. 入力の検証（不正入力の扱い）
 
+実装：`src/domain/range.ts`
+
 ```ts
-export type RangeValidationError =
-  | 'not-integer'      // 整数でない、NaN、Infinity
-  | 'negative'         // 0 未満
-  | 'exceeds-max'      // maxSeconds を超える
-  | 'start-after-end'  // start > end
+type RangeValidationError = 'incomplete' | 'not-integer' | 'negative' | 'exceeds-max' | 'start-after-end'
+type ValidationResult = { ok: true; range: TimeRange } | { ok: false; errors: RangeValidationError[] }
 
-export type ValidationResult =
-  | { readonly ok: true; readonly range: TimeRange }
-  | { readonly ok: false; readonly errors: readonly RangeValidationError[] }
-
-export function validateRange(range: TimeRange, maxSeconds: Seconds): ValidationResult
+validateRange(range: TimeRange, maxSeconds: Seconds): ValidationResult
+validateDraft(draft: RangeDraft, maxSeconds: Seconds): ValidationResult
 ```
 
-- 検証は例外を投げず、結果型で返す。該当するエラーはすべて列挙する。
-- 自動修正（start と end の入れ替え、範囲内への丸め込み）はドメイン関数では **行わない**。UI 側で不正な値が作れないようにする（UX_SPEC §4）。
-- `compareRanges` は検証済みの範囲を前提とする。未検証の値が渡された場合に備え、内部で `validateRange` を行い、不正なら `Error` を投げる（プログラムの誤りとして扱う）。
-- `stops` に含まれない値もドメイン上は有効とする（将来の入力方法の変更に備えるため）。
+| エラー | 条件 |
+|---|---|
+| `incomplete` | `validateDraft` で start または end が null（未入力） |
+| `not-integer` | 整数でない（NaN・Infinity を含む） |
+| `negative` | 0 未満 |
+| `exceeds-max` | maxSeconds を超える |
+| `start-after-end` | start > end（逆転した区間） |
+
+- 例外を投げず結果型で返す。該当するエラーはすべて重複なしで列挙する。
+- 自動修正（入れ替え・丸め込み）は行わない。
+- `compareRanges` は不正な区間を受け取ると `Error` を投げる（UI が検証を通さずに呼んだプログラムの誤りとして扱う）。
 
 ---
 
 ## 5. 区間計算
 
-A = [a1, a2]、B = [b1, b2] とする（いずれも閉区間、a1 ≤ a2、b1 ≤ b2）。
+A = [a1, a2]、B = [b1, b2]（いずれも両端を含む閉区間）。実装：`src/domain/range.ts`
 
-### 5.1 共通範囲（intersection）
+### 5.1 共通範囲と重なり
 
 ```
-lo = max(a1, b1)
-hi = min(a2, b2)
-lo <= hi なら intersection = [lo, hi]、そうでなければ null
-intersectionLength = intersection ? hi - lo : 0
+lo = max(a1, b1)、hi = min(a2, b2)
+intersectRanges(A, B)   = lo <= hi ? [lo, hi] : null
+hasIntersection(A, B)   = intersectRanges(A, B) !== null
+intersectionLength(A, B) = 共通範囲があれば hi - lo、なければ 0
 ```
 
-- **意味**：2人とも「この言葉が当てはまる」と感じた時間の範囲。
+- 境界の1点だけで接する場合も **共通点が存在する**（`hasIntersection = true`、共通範囲は長さ0の区間）。
+- **意味**：2人とも「この言葉が当てはまる」と感じた時間。
 - **限界**：共通範囲の中の時間でも、相手が実際にその時間を意図しているとは限らない。
 
-### 5.2 区間の空白（gap）
+### 5.2 区間の空白
 
 ```
-gapLength = max(0, max(a1, b1) - min(a2, b2))
+gapBetween(A, B) = max(0, max(a1, b1) - min(a2, b2))
 ```
 
-- **意味**：2人の範囲のあいだの、どちらも当てはまると答えなかった時間の長さ。
-- 共通部分があれば 0。
-- **限界**：空白が大きくても、実際の会話で困るとは限らない（状況や言い方で補われることがある）。
+- **意味**：2人の範囲のあいだの、どちらも当てはまると答えなかった時間の長さ。共通点があれば 0。
+- **限界**：空白が大きくても、実際の会話で困るとは限らない。
 
 ### 5.3 中心値と中心値の差
 
 ```
-midpointA = (a1 + a2) / 2
-midpointB = (b1 + b2) / 2
-midpointDifference = |midpointA - midpointB|
+midpoint(R) = (start + end) / 2
+midpointDifference(A, B) = |midpoint(A) - midpoint(B)|
 ```
 
-- **意味**：それぞれの範囲の「まんなか」同士がどれだけ離れているか。範囲の幅が違っても、全体として早め／遅めのどちらに寄っているかの目安になる。
-- **限界**：中心値は「その人が最もありそうだと思う時間」ではない。ユーザーは範囲しか入力していないため、範囲内のどこを重視しているかは分からない。このため UI では「範囲のまんなか」と表現し、「平均」「いちばん多い」「本当の答え」などの語を使わない。
-- 0.5 秒単位の値になりうる。表示時の丸めは §9。
+- 0.5秒単位の値になりうる（例：[0, 1] の中心値は 0.5）。
+- **意味**：それぞれの範囲の「まんなか」同士の距離。範囲全体が早め／遅めのどちらに寄っているかの目安。
+- **限界**：中心値は「その人が最もありそうだと思う時間」ではない。UI では「範囲のまんなか」と表現し、「平均」「いちばん多い」「本当の答え」などの語を使わない。図には描かず文章でのみ示す（UX_SPEC §4）。
 
-### 5.4 関係の分類（relation）
+### 5.4 6種類の関係と判定の優先順位
 
-以下の順に判定し、最初に当てはまったものを採用する。
+`classifyRelation(A, B)` は上から順に判定し、最初に当てはまったものを返す。順序で判定するため、1つの組が複数に分類されることはない。
 
-| 順 | 条件 | relation |
+| 順 | relation | 条件 |
 |---|---|---|
-| 1 | a1 = b1 かつ a2 = b2 | `identical` |
-| 2 | a1 ≤ b1 かつ b2 ≤ a2 | `a-contains-b` |
-| 3 | b1 ≤ a1 かつ a2 ≤ b2 | `b-contains-a` |
-| 4 | lo < hi | `overlap` |
-| 5 | lo = hi | `touch` |
-| 6 | lo > hi | `gap` |
+| 1 | `identical` | a1 = b1 かつ a2 = b2 |
+| 2 | `a-contains-b` | a1 ≤ b1 かつ b2 ≤ a2（1 を除く） |
+| 3 | `b-contains-a` | b1 ≤ a1 かつ a2 ≤ b2（1 を除く） |
+| 4 | `overlap` | 共通範囲の長さ > 0（1〜3 を除く） |
+| 5 | `touch` | 共通点がちょうど1点（1〜3 を除く） |
+| 6 | `gap` | 共通点なし |
 
-### 5.5 境界値の扱い
+- 完全一致は包含より優先する（一致は双方向の包含でもあるため）。
+- 2 と 3 が同時に成り立つのは一致のときだけなので、1 を先に判定すれば重複しない。
+- 包含は接触より優先する（例：点 [600, 600] と [0, 600] は `b-contains-a`）。
 
-| ケース | 例 | 結果 |
-|---|---|---|
-| 1点だけ重なる | A=[0, 300], B=[300, 900] | `touch`、intersection=[300, 300]、length=0、gap=0 |
-| 一方が他方を包含 | A=[0, 1800], B=[300, 600] | `a-contains-b`、intersection=[300, 600] |
-| 端点を共有する包含 | A=[0, 600], B=[0, 300] | `a-contains-b` |
-| 幅0の点が範囲内にある | A=[300, 300], B=[0, 600] | `b-contains-a`、intersection=[300, 300]、length=0 |
-| 幅0の点が範囲の端にある | A=[600, 600], B=[0, 600] | `b-contains-a`（包含が接触より優先） |
-| 両方が同じ点 | A=[300, 300], B=[300, 300] | `identical` |
-| 両方が異なる点 | A=[60, 60], B=[300, 300] | `gap`、gap=240 |
-| 0 を含む | A=[0, 60], B=[0, 0] | `a-contains-b` |
-| 全範囲 | A=[0, max], B=任意 | `identical` または `a-contains-b` |
-
-- 区間は閉区間として扱うため、端点が一致すれば共通部分があるとみなす。
-- touch は「共通範囲が1点だけ」である事実を伝えるが、「ほぼ同じ」「ぎりぎり同じ」といった評価はしない。
-
-### 5.6 関数一覧（Phase 2 で実装）
+### 5.5 比較結果（compareRanges）
 
 ```ts
-export function validateRange(range: TimeRange, maxSeconds: Seconds): ValidationResult
-export function intersectRanges(a: TimeRange, b: TimeRange): TimeRange | null
-export function gapBetween(a: TimeRange, b: TimeRange): Seconds
-export function midpoint(range: TimeRange): number
-export function classifyRelation(a: TimeRange, b: TimeRange): RangeRelation
-export function compareRanges(a: TimeRange, b: TimeRange, maxSeconds: Seconds): ComparisonResult
-export function formatDuration(seconds: number): string
-export function formatRange(range: TimeRange): string            // 「5分〜15分」。幅0は「5分」
-export function formatSampleLabel(sample: SampleAnswer): string  // 「ソラ（架空）」
-export function describeComparison(result: ComparisonResult, labels: { a: string; b: string }, expression: Expression): ComparisonDescription
-export function clarifyCandidates(a: TimeRange, b: TimeRange, result: ComparisonResult): ClarifyCandidate[]
-export function buildClarificationText(expression: Expression, seconds: Seconds): string
-export function positionOnScale(seconds: number, stops: readonly Seconds[]): number // 0〜1
+interface ComparisonResult {
+  relation: RangeRelation
+  hasIntersection: boolean
+  intersection: TimeRange | null
+  intersectionLength: Seconds
+  gapLength: Seconds
+  midpointA: number
+  midpointB: number
+  midpointDifference: number
+  laterMidpoint: 'A' | 'B' | 'same'
+}
 ```
 
-すべて純粋関数とし、引数を変更しない。
+### 5.6 境界値（すべてテスト済み）
+
+| ケース | A | B | relation | 共通範囲 | 空白 |
+|---|---|---|---|---|---|
+| 完全一致 | [60, 300] | [60, 300] | identical | [60, 300] | 0 |
+| 一部重複 | [0, 900] | [180, 1800] | overlap | [180, 900] | 0 |
+| 完全分離 | [0, 300] | [900, 1800] | gap | null | 600 |
+| A が B を包含 | [0, 1800] | [300, 600] | a-contains-b | [300, 600] | 0 |
+| B が A を包含 | [300, 600] | [0, 1800] | b-contains-a | [300, 600] | 0 |
+| 1点接触 | [0, 300] | [300, 900] | touch | [300, 300] | 0 |
+| 端点を共有する包含 | [0, 600] | [0, 300] | a-contains-b | [0, 300] | 0 |
+| 長さ0の点が範囲内 | [300, 300] | [0, 600] | b-contains-a | [300, 300] | 0 |
+| 長さ0の点が範囲の端 | [600, 600] | [0, 600] | b-contains-a | [600, 600] | 0 |
+| 同じ点 | [300, 300] | [300, 300] | identical | [300, 300] | 0 |
+| 異なる点 | [60, 60] | [300, 300] | gap | null | 240 |
+| 0秒を含む | [0, 60] | [0, 0] | a-contains-b | [0, 0] | 0 |
+| 中心値が0.5秒 | [0, 1] | [0, 0] | a-contains-b | [0, 0] | 0（中心値の差 0.5） |
 
 ### 5.7 意図的に導入しない指標
 
 | 指標 | 導入しない理由 |
 |---|---|
 | すれ違い率・誤解率 | 範囲の重なりから誤解の発生確率を推定する根拠がない |
-| 相性スコア・一致度（%） | 1つの数値にすると「点数」「正解・不正解」に見え、判定しない方針に反する |
-| 重なり率（共通範囲 ÷ 和集合など） | 数学的には定義できるが、非線形軸の見た目と数値が食い違い、スコアとして受け取られやすい。MVPでは表示しない |
+| 相性スコア・一致度（%） | 「点数」「正解・不正解」に見え、判定しない方針に反する |
+| 重なり率（共通範囲 ÷ 和集合など） | 数学的には定義できるが、スコアとして受け取られやすい。MVP では使わない |
 | 平均・分布 | 2人の比較では意味が薄く、サンプルを統計と誤認させる恐れがある |
 
 ---
 
-## 6. 言葉の具体化（Clarification）
+## 6. 線形時間軸の座標計算
 
-### 6.1 方針
+実装：`src/domain/scale.ts`
 
-- 計算は **話し合いの手がかり（候補）** を示すだけで、採用する時間は人が選ぶ。
-- アプリが自動で「この時間に決定」とすることはない。初期状態では時間は **未選択** とする。
-
-### 6.2 候補の生成（clarifyCandidates）
+- 時間軸は **実際の経過時間に比例する線形軸** とする。
+- 表示範囲（`domain`、秒）と描画座標（`range`、px など）を持つ `LinearScale` を作り、相互に変換する。
+- 表示範囲を変えた scale を作り直すだけで拡大表示に対応できる（ズーム UI は Phase 2・3 では作らない）。
 
 ```ts
-export interface ClarifyCandidate {
-  readonly seconds: Seconds
-  /** 候補の根拠。表示ラベルの生成に使う */
-  readonly basis: 'end-of-a' | 'end-of-b' | 'end-of-intersection'
-}
+createLinearScale(domain: {start, end}, range: {start, end}): LinearScale
+timeToCoordinate(scale, seconds, { clamp? }): number
+coordinateToTime(scale, coordinate, { clamp?, round? }): number
+projectRange(scale, range: TimeRange): ProjectedRange | null
+generateTicks(view: TimeRange, maxTicks: number): Seconds[]
 ```
 
-- 具体化の文型は「◯◯以内」「◯◯だけ」のように **上限** を約束する形とする。そのため候補は各範囲の **終わり（end）** を使う。
-  - `end-of-a`：A の範囲の終わり（a2）
-  - `end-of-b`：B の範囲の終わり（b2）
-  - `end-of-intersection`：共通範囲の終わり（共通部分がある場合のみ）
-- 値が 0 の候補は除外する（「0分以内」は約束として成り立たないため）。
-- 同じ秒数の候補は1つにまとめ、根拠は最初のもの（`end-of-intersection` > `end-of-a` > `end-of-b` の順）を残す。
-- 昇順に並べる。候補の数は 0〜3 個（両方の範囲の終わりが 0 なら候補なし）。
-- 「2人の間をとる（中央値）」のような計算上の妥協案は自動生成しない。人が話し合って選ぶ余地を残すため。
+| 関数 | 仕様 |
+|---|---|
+| `createLinearScale` | domain の end ≤ start、range の長さ 0、有限でない値は `RangeError`。range は逆向き（start > end）も可 |
+| `timeToCoordinate` | `rangeStart + (t - domainStart) / (domainEnd - domainStart) × (rangeEnd - rangeStart)`。既定では表示範囲外も比例して外挿。`clamp: true` で端に丸める |
+| `coordinateToTime` | 上の逆変換。`clamp` で表示範囲に丸め、`round` で整数秒に四捨五入 |
+| `projectRange` | 範囲を座標に変換し、表示範囲からはみ出した部分を切り取る（`clippedAtStart`・`clippedAtEnd`）。表示範囲と共通点がなければ null。表示範囲の端に接する範囲は残す |
+| `generateTicks` | 目盛りの間隔を候補（1秒〜24時間の「切りのよい」値）から選ぶ。目盛り数が `maxTicks` 以下になる最小の間隔の倍数を、表示範囲内に並べる。間引きは目盛りを減らすだけで、比例関係は変えない |
 
-### 6.3 選択できる時間
+---
 
-- 候補に加え、その言葉の `stops` のうち 0 を除くすべての値から選べる。
-- 選んだ時間 `seconds` は 1 以上、`maxSeconds` 以下の整数でなければならない。
+## 7. 言葉の具体化（解釈と実行可能性の区別）
 
-### 6.4 文の生成（buildClarificationText）
+実装：`src/domain/agreement.ts`
 
-`expression.clarifyTemplate` の `{time}` を `formatDuration(seconds)` で置換する。
+### 7.1 方針
 
-| ID | clarifyTemplate | 例（600秒） |
+- 比較結果から出す時間の候補は **解釈の手がかり** であり、実行できる約束ではない。
+- アプリは時間を自動で決定しない。初期状態は未選択。
+- ユーザーが時間を選び、**その時間で実際にできるか（実行可能性）を本人が確認したうえで** 承認する。確認なしの承認はセッションが拒否する（§8）。
+
+### 7.2 候補（agreementCandidates）
+
+- 文型は「◯◯以内」「◯◯だけ」のように上限を約束する形のため、候補には範囲の **終わり** を使う。
+  - `end-of-intersection`：共通範囲の終わり（共通点がある場合のみ）
+  - `end-of-a`：A の範囲の終わり
+  - `end-of-b`：B の範囲の終わり
+- 0秒は除外する。同じ秒数は `end-of-intersection` > `end-of-a` > `end-of-b` の優先順で1つにまとめ、昇順に並べる。候補は 0〜3 個。
+- 中間値などの **妥協点は生成しない**。
+
+### 7.3 選べる時間
+
+- `isValidAgreementSeconds`：1秒以上、maxSeconds 以下の整数。候補以外の時間も選べる。
+
+### 7.4 文の生成
+
+| ID | agreementTemplate（例：600秒） | feasibilityTemplate（例：600秒） |
 |---|---|---|
-| `sugu-iku` | `{time}以内に行くね` | 10分以内に行くね |
-| `chotto-matte` | `{time}だけ待ってて` | 10分だけ待ってて |
-| `atode-yaru` | `{time}以内に始めるね` | 10分以内に始めるね |
+| `sugu-iku` | 10分以内に行くね | 10分以内に、本当に着けそう？ |
+| `chotto-matte` | 10分だけ待ってて | 10分で、本当に行けそう？ |
+| `atode-yaru` | 10分以内に始めるね | 10分以内に、本当に始められそう？ |
 
-### 6.5 確認
-
-- ふたりモード：A と B がそれぞれ「OK」を押すと `confirmedBy` に追加される。両方そろうと完了。どちらかが「変えたい」を押すと `confirmedBy` を空にして時間の選択に戻る。
-- ひとりモード：比較相手は架空のサンプルで同意できないため、`confirmedBy` は `['A']` で完了とする。完了画面では「本当の相手と使うときは、相手にも確認しよう」と表示する。
+`buildAgreementText`・`buildFeasibilityQuestion` が `{time}` を `formatDuration` の結果で置換する。
 
 ---
 
-## 7. セッション状態（ひとりモード・ふたりモード）
+## 8. セッション状態
 
-画面遷移はこの状態の `step` で決まる。状態更新は純粋なリデューサー関数で行う（TECH_SPEC §3）。
+実装：`src/domain/session.ts`（状態遷移）、`src/domain/views.ts`（UI へ渡す情報の選択）
+
+### 8.1 状態
 
 ```ts
-export type Mode = 'solo' | 'duo'
+type SessionStep = 'HOME' | 'SCENARIO_SELECT' | 'INPUT_A' | 'HANDOFF' | 'INPUT_B'
+                 | 'READY_TO_REVEAL' | 'COMPARISON' | 'AGREEMENT' | 'COMPLETE'
 
-export type Step =
-  | 'start'
-  | 'select'
-  | 'input-a'
-  | 'handoff-to-b'   // ふたりモードのみ
-  | 'input-b'        // ふたりモードのみ
-  | 'handoff-reveal' // ふたりモードのみ
-  | 'compare'
-  | 'clarify'
-  | 'done'
-
-export interface SessionState {
-  readonly step: Step
-  readonly mode: Mode | null
-  readonly expressionId: ExpressionId | null
-  readonly rangeA: TimeRange | null
-  readonly rangeB: TimeRange | null          // ふたりモードの2人目
-  readonly selectedSampleId: string | null   // ひとりモードの比較相手
-  readonly clarifySeconds: Seconds | null
-  readonly confirmedBy: readonly ParticipantId[]
+interface SessionState {
+  step: SessionStep
+  mode: Mode | null
+  scenarioId: ScenarioId | null
+  draft: RangeDraft            // 入力中の範囲。初期値は未入力 { start: null, end: null }
+  answerA: TimeRange | null
+  answerB: TimeRange | null    // ふたりモードの2人目
+  sampleId: string | null      // ひとりモードで比較中の架空サンプル
+  agreement: { seconds: Seconds | null; approvedBy: ParticipantId[] }
 }
-
-export type SessionAction =
-  | { type: 'choose-mode'; mode: Mode }
-  | { type: 'choose-expression'; expressionId: ExpressionId }
-  | { type: 'submit-range'; range: TimeRange }
-  | { type: 'continue' }                       // handoff 画面・比較画面から次へ
-  | { type: 'choose-sample'; sampleId: string }
-  | { type: 'choose-clarify-seconds'; seconds: Seconds }
-  | { type: 'confirm'; participant: ParticipantId }
-  | { type: 'request-change' }                 // 具体化をやり直す
-  | { type: 'back' }
-  | { type: 'choose-another' }                 // 完了後、同じモードで別の言葉へ
-  | { type: 'reset' }
 ```
 
-### 7.1 遷移表
+### 8.2 イベント
 
-| 現在 | アクション | 次 | 備考 |
+| イベント | 内容 |
+|---|---|
+| `SELECT_MODE { mode }` | モードを選ぶ |
+| `SELECT_SCENARIO { scenarioId }` | シナリオを選ぶ |
+| `SET_DRAFT { draft }` | 入力中の範囲を更新する（確定ではない） |
+| `SUBMIT_ANSWER` | 入力中の範囲を回答として確定する |
+| `START_INPUT_B` | 交代画面から B の入力へ |
+| `REVEAL` | 公開前画面から比較へ |
+| `SELECT_SAMPLE { sampleId }` | ひとりモードで比較するサンプルを変える |
+| `START_AGREEMENT` | 比較から具体化へ |
+| `CHOOSE_AGREEMENT_TIME { seconds }` | 具体化の時間を選ぶ（確認はリセット） |
+| `APPROVE_AGREEMENT { participant, feasibilityConfirmed }` | 実行可能性を確認したうえで承認する |
+| `REVISE_AGREEMENT` | 時間の選択からやり直す |
+| `BACK` | 1つ前へ（許可された画面のみ） |
+| `RESTART_SAME_MODE` | 同じモードのまま、シナリオ選択からやり直す |
+| `RESET` | 最初（HOME）に戻る |
+
+### 8.3 遷移表
+
+| 現在 | イベント | 次 | 条件・備考 |
 |---|---|---|---|
-| start | choose-mode | select | mode を設定 |
-| select | choose-expression | input-a | |
-| select | back | start | |
-| input-a | submit-range | solo: compare / duo: handoff-to-b | solo では最初のサンプルを selectedSampleId に設定 |
-| input-a | back | select | rangeA は保存しない |
-| handoff-to-b | continue | input-b | |
-| input-b | submit-range | handoff-reveal | |
-| input-b | back | handoff-to-b | **input-a へは戻れない**（A の回答を B に見せないため） |
-| handoff-reveal | continue | compare | |
-| compare | choose-sample | compare | solo のみ |
-| compare | continue | clarify | |
-| clarify | choose-clarify-seconds | clarify | confirmedBy を空にする |
-| clarify | confirm | clarify / done | duo：A・B 両方そろえば done。solo：A で done |
-| clarify | request-change | clarify | clarifySeconds と confirmedBy を空にする |
-| clarify | back | compare | clarifySeconds と confirmedBy を空にする |
-| done | reset | start | 全状態を初期化 |
-| done | choose-another | select | mode だけ残し、ほかの状態を初期化 |
-| 任意 | reset | start | 「最初から」ボタン |
+| HOME | SELECT_MODE | SCENARIO_SELECT | |
+| SCENARIO_SELECT | SELECT_SCENARIO | INPUT_A | 存在するシナリオのみ。draft は未入力 |
+| SCENARIO_SELECT | BACK | HOME | |
+| INPUT_A / INPUT_B | SET_DRAFT | 同じ | |
+| INPUT_A | SUBMIT_ANSWER | solo: COMPARISON / duo: HANDOFF | draft が完全かつ有効なときのみ。solo では先頭のサンプルを選ぶ |
+| INPUT_A | BACK | SCENARIO_SELECT | 入力は破棄 |
+| HANDOFF | START_INPUT_B | INPUT_B | draft は未入力 |
+| INPUT_B | SUBMIT_ANSWER | READY_TO_REVEAL | draft が完全かつ有効なときのみ |
+| INPUT_B | BACK | HANDOFF | **INPUT_A には戻れない** |
+| READY_TO_REVEAL | REVEAL | COMPARISON | |
+| COMPARISON | SELECT_SAMPLE | 同じ | solo のみ。同じシナリオのサンプルのみ |
+| COMPARISON | START_AGREEMENT | AGREEMENT | |
+| AGREEMENT | CHOOSE_AGREEMENT_TIME | 同じ | 1秒以上・上限以下の整数。承認をリセット |
+| AGREEMENT | APPROVE_AGREEMENT | 同じ / COMPLETE | 時間選択済み・`feasibilityConfirmed: true`・承認すべき人・未承認のときのみ。solo は A、duo は A と B がそろうと COMPLETE |
+| AGREEMENT | REVISE_AGREEMENT | 同じ | 時間と承認をクリア |
+| AGREEMENT | BACK | COMPARISON | 時間と承認をクリア |
+| COMPARISON / AGREEMENT / COMPLETE | RESTART_SAME_MODE | SCENARIO_SELECT | mode だけ残して初期化 |
+| すべて | RESET | HOME | 全状態を初期化 |
 
-- 表にない組み合わせのアクションは無視し、状態を変えない。
-- 入力が不正な `submit-range` は無視する（UI では不正値を作れないが、防御として）。
-- handoff-to-b / input-b / handoff-reveal の各画面は `rangeA` の値を表示しない。
+- COMPARISON からの BACK は拒否する（入力画面へは戻らない）。やり直しは RESTART_SAME_MODE または RESET。
+- 表にない組み合わせはすべて **拒否** する。
 
----
+### 8.4 拒否の扱い
 
-## 8. 軸上の位置（positionOnScale）
-
-非線形軸に秒数を配置するための関数。
-
-```
-stops = [s0, s1, ..., sn]（s0 = 0, sn = max）
-seconds が si ≤ seconds ≤ s(i+1) にあるとき
-  position = (i + (seconds - si) / (s(i+1) - si)) / n
+```ts
+transition(state, event, catalog): { ok: true; state } | { ok: false; state; error: TransitionError }
+createSessionReducer(catalog): (state, event) => state   // useReducer 用
 ```
 
-- 戻り値は 0〜1。stops 上の値は等間隔の位置になる。
-- 範囲外の値は 0 または 1 に丸める（描画の安全のため。計算には使わない）。
-- 区間の端点・共通範囲の端点・空白の端点は必ず入力値なので、stops 上の位置に来る。中心値は stops 上に来ないことがあり、区分線形補間で配置される。このため非線形軸では **中心値は見た目の範囲のまんなかと一致しない**。MVP では中心値を軸上に描画せず、文章でのみ示す（要確認事項 D-6）。
+- 拒否時は元の state オブジェクトをそのまま返し、理由（`TransitionError`）を付ける：
+  `invalid-event-for-step` / `unknown-scenario` / `unknown-sample` / `invalid-answer` / `invalid-agreement-time` / `agreement-time-not-chosen` / `feasibility-not-confirmed` / `invalid-participant` / `already-approved`
+- シナリオとサンプルは `SessionCatalog` として引数で渡す（テストで差し替え可能。既定は `src/data/catalog.ts`）。
+
+### 8.5 UI へ渡す情報（views.ts）
+
+| 関数 | 返す情報 | 返す画面 |
+|---|---|---|
+| `selectInputView` | participant, mode, scenario, draft, canSubmit | INPUT_A / INPUT_B |
+| `selectComparisonView` | scenario, a・b（ラベルと範囲）, result, description, candidates, samples, selectedSampleId | COMPARISON / AGREEMENT / COMPLETE |
+| `selectAgreementView` | seconds, text, feasibilityQuestion, approvedBy, requiredApprovers | AGREEMENT / COMPLETE |
+
+- `selectInputView` は **もう一方の回答を含まない**。ふたりモードで B の入力画面に A の回答が届かない（テスト済み）。
+- `selectComparisonView` は比較画面以降でのみ値を返す（READY_TO_REVEAL では null）。
+- ラベル：ひとりモードは「あなた」と「ソラ（架空）」、ふたりモードは「Aさん」「Bさん」。
 
 ---
 
 ## 9. 表示用の文字列
 
-### 9.1 時間の表示（formatDuration）
+### 9.1 時間の表示（format.ts）
 
-- 入力は秒（0.5秒単位の値を含みうる）。まず `Math.round` で整数秒に丸める（0.5 は切り上げ）。
-- 表示規則：
+| 入力 | 表示 |
+|---|---|
+| 0 | 0分 |
+| 1〜59秒 | N秒 |
+| 60〜3599秒 | N分（端数があれば N分M秒） |
+| 3600秒以上 | N時間（端数があれば N時間M分。秒は切り捨て） |
 
-| 範囲 | 形式 | 例 |
+- 0.5秒単位の値は四捨五入（0.5 は切り上げ）してから表示する。負の値・非有限値は `RangeError`。
+- `formatRange`：「5分〜15分」。長さ0は「5分」。
+- `formatSampleLabel`：「ソラ（架空）」。データの `name` には「（架空）」を含めず、表示時に必ず付ける。
+
+### 9.2 比較結果の説明文（describe.ts）
+
+生成ルール：
+
+1. 範囲の値・共通範囲・空白・中心値の差だけを用いる。
+2. 「正しい」「正解」「間違い」「普通」「常識」「相性」「確率」「誤解」「すれ違い」「率」「%」「スコア」「点数」「ずれ」「〜すぎ」「良い」「悪い」を使わない（テストで検査）。
+3. どちらかを基準にしない（「B のほうがまんなかが◯分あと」は可）。
+4. 誤解を断定しない。
+
+| relation | headline（例） | details |
 |---|---|---|
-| 0 | 「0分」 | 0分 |
-| 1〜59秒 | 「N秒」 | 30秒 |
-| 60秒〜3599秒 | 「N分」、端数があれば「N分M秒」 | 5分、1分30秒 |
-| 3600秒以上 | 「N時間」、端数があれば「N時間M分」（秒は切り捨て） | 2時間、1時間30分 |
+| identical | 2人の「すぐ行く」はぴったり同じでした | 2人とも◯〜◯だと考えていました。 |
+| a-contains-b / b-contains-a | Bさんの「すぐ行く」は、Aさんの範囲にすっぽり入っています | 両者の範囲／共通しているのは◯〜◯です。／中心値の文 |
+| overlap | 2人の「すぐ行く」は一部だけ重なっています | 両者の範囲／2人とも当てはまると考えたのは◯〜◯です。／中心値の文 |
+| touch | 2人の「すぐ行く」は5分の1点だけで重なっています | 両者の範囲／共通しているのは5分ちょうどの1点です。／中心値の文 |
+| gap | 2人の「すぐ行く」は重なりませんでした | 両者の範囲／2人の範囲のあいだには◯のひらきがあります。／中心値の文／このまま使うと、思っていた時間がちがうかもしれません。 |
 
-- 範囲は「A〜B」（例：「5分〜15分」）。幅0なら単独表記（例：「5分」）。
-
-### 9.2 比較結果の説明文（describeComparison）
-
-```ts
-export interface ComparisonDescription {
-  /** 見出し：関係を一言で */
-  readonly headline: string
-  /** 本文：具体的な数値を含む事実の説明（1〜3文） */
-  readonly details: readonly string[]
-  /** 次の行動へのうながし */
-  readonly prompt: string
-}
-```
-
-#### 生成ルール
-
-1. **事実だけを述べる**：範囲の値・共通範囲・空白・中心値の差のみを用いる。
-2. **評価語を使わない**：「正しい」「間違い」「ずれている」「おかしい」「普通」「常識」「相性」「◯%一致」などは使わない。
-3. **どちらかを基準にしない**：「A さんより B さんが遅い」は可（事実の比較）。「B さんは遅すぎる」は不可。
-4. **誤解を断定しない**：「誤解する」「すれ違う」と断言しない。使う場合は「〜かもしれません」とする。
-5. 名前には UI のラベル（「あなた」「サンプル：ソラ（架空）」「Aさん」「Bさん」）を使う。
-6. 時間はすべて `formatDuration` で表示する。
-
-#### relation 別のテンプレート（a・b は表示名、phrase は言葉）
-
-| relation | headline | details（例） |
-|---|---|---|
-| identical | 2人の「{phrase}」はぴったり同じでした | 2人とも {範囲} だと考えていました。 |
-| a-contains-b | {b}の「{phrase}」は、{a}の範囲にすっぽり入っています | {a}は {範囲A}、{b}は {範囲B} でした。／共通しているのは {共通範囲} です。 |
-| b-contains-a | {a}の「{phrase}」は、{b}の範囲にすっぽり入っています | 同上（a・b 入れ替え） |
-| overlap | 2人の「{phrase}」は一部だけ重なっています | 2人とも当てはまると考えたのは {共通範囲} です。／範囲のまんなかは {中心値の差} ちがいます。 |
-| touch | 2人の「{phrase}」は {t} の1点だけで接しています | {a}は {範囲A}、{b}は {範囲B} でした。 |
-| gap | 2人の「{phrase}」は重なりませんでした | {a}は {範囲A}、{b}は {範囲B} でした。／2人の範囲のあいだには {空白} のひらきがあります。 |
-
-- 中心値の差は、`overlap`・`gap`・包含の場合に details に含める（identical では 0 のため省略）。`midpointDifference` が 0 の場合は「範囲のまんなかは同じです」とする。
+- 中心値の文：差が 0 なら「範囲のまんなかは同じです。」、それ以外は「範囲のまんなかは、◯◯のほうが◯分あとです。」
 - prompt（共通）：「同じ言葉でも、思い浮かべる時間はちがうことがあります。具体的な時間にしてみましょう。」
-- gap のときの追加文（任意）：「このまま使うと、思っていた時間がちがうかもしれません。」（断定しない）
-
-具体的な文言は Phase 3 で調整してよいが、上記のルール 1〜6 は守る。
 
 ---
 
-## 10. 架空のサンプルデータ（ひとりモード）
+## 10. 架空のサンプルデータ
 
-- 各言葉につき 3 件の `SampleAnswer` を用意する（具体値は [DEMO_SPEC.md](DEMO_SPEC.md) §7）。
-- 表示名には必ず「（架空）」を付ける（`formatSampleLabel`。データの `name` には付けない）。画面には「このサンプルは説明用に作った架空の回答です。実際の調査結果ではありません。」を表示する。
-- サンプル同士を集計（平均・多数決など）して表示しない。
-- サンプルデータはソースコード（`src/data/samples.ts`）に定数として置き、ファイル冒頭のコメントでも架空であることを明記する。
+実装：`src/data/samples.ts`（値は [DEMO_SPEC.md](DEMO_SPEC.md) §7）
+
+- 各シナリオ 3 件。すべて `fictional: true`。値は入力の刻みに合う。
+- ファイル冒頭のコメントと画面表示で架空であることを明記する。
+- 集計（平均・多数決など）して表示しない。
+- 各シナリオの先頭のサンプルが最初に表示される。
 
 ---
 
-## 11. テストすべき性質（Phase 2）
+## 11. テスト（Phase 2 で実装済み）
 
-- §5.5 の境界値表のすべてのケース
-- 対称性：`intersectRanges(a, b)` と `intersectRanges(b, a)` は等しい。`gapBetween`・`midpointDifference` も対称。`classifyRelation` は `a-contains-b` ⇔ 入れ替え後 `b-contains-a`。
-- `gapLength > 0` ⇔ `intersection === null`
-- `relation === 'touch'` ⇒ `intersectionLength === 0`
-- `validateRange` の各エラーと複数エラーの同時検出
-- `formatDuration` の各表示形式と丸め（例：7.5秒 → 8秒、450.5秒 → 7分31秒）
-- `positionOnScale` が stops 上で等間隔になること、範囲外を丸めること
-- `clarifyCandidates` が 0 を除外し、重複をまとめ、昇順であること
-- `describeComparison` の出力に禁止語（§9.2 ルール2）が含まれないこと
-- セッションリデューサーの遷移表（§7.1）、特に input-b から input-a へ戻れないこと
+| ファイル | 内容 |
+|---|---|
+| `tests/domain/range.test.ts` | 検証（逆転・上限超過・負・非整数・未入力・複数エラー）、共通範囲・空白・中心値（0.5秒）、6分類と境界値、対称性、gap と共通点の排他性 |
+| `tests/domain/format.test.ts` | 時間表示の各形式と丸め、範囲表示、架空ラベル |
+| `tests/domain/describe.test.ts` | 6分類の説明文、禁止語が含まれないこと |
+| `tests/domain/agreement.test.ts` | 候補の生成（0除外・重複統合・妥協点なし）、時間の検証、文型 |
+| `tests/domain/scale.test.ts` | 線形変換の正確性・逆変換・外挿と丸め・表示範囲の変更・切り取り・目盛り |
+| `tests/domain/session.test.ts` | 両モードの全体の流れ、未入力回答の確定拒否、不正な遷移、INPUT_B → INPUT_A 不可、実行可能性の確認、リセット・やり直し |
+| `tests/domain/views.test.ts` | B の入力画面に A の回答が含まれないこと、公開前に比較が出ないこと |
+| `tests/data/catalog.test.ts` | シナリオの最大値・刻み、サンプルの件数・有効性・架空フラグ |
