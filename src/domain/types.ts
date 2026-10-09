@@ -90,3 +90,35 @@ export interface AgreementCandidate {
   readonly seconds: Seconds
   readonly basis: 'end-of-intersection' | 'end-of-a' | 'end-of-b'
 }
+
+// ===== 場面を変えて比べる（Phase 6A） =====
+
+export type ContextSceneId = 'tell-friend' | 'reply-message' | 'start-homework'
+
+/**
+ * 「場面を変えて比べる」の1場面。同じ言葉（すぐ）を、場面だけ変えてたずねる。
+ * 起点はどの場面も「その言葉を伝えた瞬間」、終点は「その行動を始める瞬間」にそろえる。
+ */
+export interface ContextScene {
+  readonly id: ContextSceneId
+  /** 図や一覧で使う短い名前。例：「すぐ行く」 */
+  readonly phrase: string
+  /** 場面の説明 */
+  readonly scene: string
+  /** 終点（行動を始める瞬間）の説明。例：「行くために動き出す」 */
+  readonly actionLabel: string
+  readonly question: string
+}
+
+/** 「場面を変えて比べる」の共通設定。3場面すべてに同じ値を使う */
+export interface ContextSettings {
+  /** 3場面に共通する言葉。例：「すぐ」 */
+  readonly word: string
+  /** 起点（0秒）の説明 */
+  readonly originLabel: string
+  /** 終点の説明（場面ごとの行動をまとめた言い方） */
+  readonly endpointLabel: string
+  /** アプリで扱う比較範囲の上限。言葉の意味の客観的な上限ではない */
+  readonly maxSeconds: Seconds
+  readonly inputStepSeconds: Seconds
+}

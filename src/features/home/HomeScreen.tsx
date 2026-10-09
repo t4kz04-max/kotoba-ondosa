@@ -32,7 +32,13 @@ function HeroVisual() {
   )
 }
 
-export function HomeScreen({ onSelectMode }: { readonly onSelectMode: (mode: Mode) => void }) {
+interface HomeScreenProps {
+  readonly onSelectMode: (mode: Mode) => void
+  /** 「場面を変えて比べる」を始める。渡されないときはカードを出さない */
+  readonly onStartContext?: () => void
+}
+
+export function HomeScreen({ onSelectMode, onStartContext }: HomeScreenProps) {
   const headingRef = useFocusHeading()
   return (
     <section className="screen screen--home">
@@ -84,6 +90,21 @@ export function HomeScreen({ onSelectMode }: { readonly onSelectMode: (mode: Mod
           </span>
         </button>
       </div>
+      {onStartContext !== undefined && (
+        <>
+          <h2 className="section-label">もうひとつの体験</h2>
+          <button type="button" className="mode-card mode-card--context" onClick={onStartContext}>
+            <span className="mode-card__icon">
+              <Icon name="layers" size={26} />
+            </span>
+            <span className="mode-card__title">場面を変えて比べる</span>
+            <span className="mode-card__desc">あなたの「すぐ」は、いつも同じ？ 3つの場面でくらべます</span>
+            <span className="mode-card__go" aria-hidden="true">
+              <Icon name="arrowRight" size={18} />
+            </span>
+          </button>
+        </>
+      )}
       <p className="note note--center">回答はどこにも保存・送信されません。</p>
     </section>
   )

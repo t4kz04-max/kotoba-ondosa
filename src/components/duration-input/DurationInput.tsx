@@ -1,5 +1,6 @@
 import { useId, useState, type CSSProperties } from 'react'
 import { formatDuration } from '../../domain/format'
+import type { TimelineVariant } from '../timeline/layout'
 import type { Seconds } from '../../domain/types'
 import {
   fieldsToSeconds,
@@ -23,7 +24,7 @@ interface DurationInputProps {
   readonly stepSeconds: Seconds
   readonly describedBy?: string
   /** 色の系統。A（あなた・Aさん）・B（Bさん）・どちらでもない */
-  readonly tone?: 'a' | 'b' | 'neutral'
+  readonly tone?: TimelineVariant | 'neutral'
   /** この欄の値に問題があるとき true（枠を強調し、aria-invalid を付ける） */
   readonly invalid?: boolean
   /** この欄だけの問題を、欄のすぐ下に出す文（範囲全体の問題は呼び出し側で表示する） */

@@ -2,12 +2,21 @@ import { useId, useState } from 'react'
 import { formatDuration, formatRange } from '../../domain/format'
 import type { ComparisonResult, TimeRange } from '../../domain/types'
 import { useElementWidth } from '../../hooks/useElementWidth'
-import { BAR_HEIGHT, buildTimelineLayout, FIRST_BAR_Y, type TimelineBar, type TimelineRowInput } from './layout'
+import {
+  BAR_HEIGHT,
+  buildTimelineLayout,
+  FIRST_BAR_Y,
+  type TimelineBar,
+  type TimelineRowInput,
+  type TimelineVariant,
+} from './layout'
 
 interface TimelineChartProps {
   readonly view: TimeRange
   readonly rows: readonly TimelineRowInput[]
   readonly comparison?: ComparisonResult | null
+  /** 3つ以上の範囲の共通部分（「場面を変えて比べる」用） */
+  readonly common?: TimeRange | null
   /** 図の内容を文章で表したもの（スクリーンリーダー用） */
   readonly description: string
   /** 細すぎる帯があるとき、拡大表示を案内する */
@@ -78,13 +87,27 @@ function BarShape({ bar, fill, className }: ShapeProps) {
  * 線形の時間軸に範囲を描く。座標計算は layout.ts（domain/scale.ts）に任せ、ここでは描画だけを行う。
  * A は塗りつぶし、B は斜線で、色以外でも区別する。
  */
-export function TimelineChart({ view, rows, comparison, description, showZoomHint, overlay, emptyLabel, swapKey, animate }: TimelineChartProps) {
+export function TimelineChart({ view, rows, comparison, description, showZoomHint, overlay, emptyLabel, swapKey, animate, common }: TimelineChartProps) {
   const [containerRef, width] = useElementWidth<HTMLDivElement>(320)
   const idBase = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const hatchId = `hatch-${idBase}`
-  const layout = buildTimelineLayout({ view, width, rows, comparison, overlay: overlay !== undefined })
+  const layout = buildTimelineLayout({ view, width, rows, comparison, common, overlay: overlay !== undefined })
   const { intersection, gap } = layout
-  const fillFor = (variant: 'a' | 'b') => (variant === 'a' ? 'var(--chart-a)' : `url(#${hatchId})`)
+  // 帯の塗り。A は塗りつぶし、B は斜線。場面1は塗りつぶし、場面2は横線、場面3は点（色以外でも区別する）
+  const fillFor = (variant: TimelineVariant): string => {
+    switch (variant) {
+      case 'a':
+        return 'var(--chart-a)'
+      case 'b':
+        return `url(#${hatchId})`
+      case 's1':
+        return 'var(--chart-s1)'
+      case 's2':
+        return `url(#${hatchId}-s2)`
+      case 's3':
+        return `url(#${hatchId}-s3)`
+    }
+  }
   const marksBottom = layout.overlay === null ? null : layout.overlay.barY + layout.overlay.barHeight
 
   // 表示範囲（scale）と B の範囲のキー。変わった部分だけを作り直し、2回目以降はフェードで現れるようにする
@@ -113,6 +136,14 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
           <pattern id={hatchId} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="7" height="7" fill="var(--chart-b-soft)" />
             <line x1="0" y1="0" x2="0" y2="7" stroke="var(--chart-b)" strokeWidth="3.5" />
+          </pattern>
+          <pattern id={`${hatchId}-s2`} width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="var(--chart-s2-soft)" />
+            <line x1="0" y1="1.5" x2="6" y2="1.5" stroke="var(--chart-s2)" strokeWidth="3" />
+          </pattern>
+          <pattern id={`${hatchId}-s3`} width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="var(--chart-s3-soft)" />
+            <circle cx="3" cy="3" r="1.8" fill="var(--chart-s3)" />
           </pattern>
         </defs>
 

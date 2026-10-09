@@ -215,3 +215,32 @@ describe('buildTimelineLayout: overlay row (comparison)', () => {
     expect(zero.overlay!.bars[0].x2 - zero.overlay!.bars[0].x1).toBe(0)
   })
 })
+
+describe('buildTimelineLayout: three scene rows (場面を変えて比べる)', () => {
+  const rows = [
+    { label: '① すぐ行く', range: { start: 0, end: 300 }, variant: 's1' as const },
+    { label: '② すぐ返信する', range: { start: 300, end: 600 }, variant: 's2' as const },
+    { label: '③ すぐ始める', range: { start: 120, end: 300 }, variant: 's3' as const },
+  ]
+
+  it('places all three rows on the same linear scale', () => {
+    const layout = buildTimelineLayout({ view: FULL, width: WIDTH, rows, common: { start: 300, end: 300 } })
+    expect(layout.bars).toHaveLength(3)
+    expect(layout.bars[0].x2).toBeCloseTo(xOf(300))
+    expect(layout.bars[1].x1).toBeCloseTo(xOf(300))
+    expect(layout.bars[2].x1).toBeCloseTo(xOf(120))
+    expect(layout.bars[2].barY).toBeGreaterThan(layout.bars[1].barY)
+  })
+
+  it('marks a common point across all rows without width', () => {
+    const layout = buildTimelineLayout({ view: FULL, width: WIDTH, rows, common: { start: 300, end: 300 } })
+    expect(layout.intersection).toMatchObject({ isPoint: true })
+    expect(layout.intersection!.x2 - layout.intersection!.x1).toBe(0)
+    expect(layout.intersection!.bottom).toBeGreaterThan(layout.bars[2].barY + layout.bars[2].barHeight)
+    expect(layout.gap).toBeNull()
+  })
+
+  it('has no common mark when there is no common part', () => {
+    expect(buildTimelineLayout({ view: FULL, width: WIDTH, rows, common: null }).intersection).toBeNull()
+  })
+})

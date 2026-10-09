@@ -46,6 +46,20 @@
   --color-common-soft: #d1fae5;
   --color-common-band: rgba(5, 150, 105, 0.13);
 
+  /*
+   * 「場面を変えて比べる」の3場面。A（オレンジ）・B（青）・共通（緑）と混同しない色にし、
+   * 線種（塗り・横線・点）と丸数字でも区別する。すべて白地で 6:1 以上
+   */
+  --chart-s1: #6d28d9;
+  --chart-s1-soft: #ede9fe;
+  --color-s1-strong: #5b21b6;
+  --chart-s2: #475569;
+  --chart-s2-soft: #e2e8f0;
+  --color-s2-strong: #334155;
+  --chart-s3: #be185d;
+  --chart-s3-soft: #fce7f3;
+  --color-s3-strong: #9d174d;
+
   --color-error: #b91c1c;
   --color-error-soft: #fef2f2;
   --color-focus: #1d4ed8;
@@ -106,7 +120,12 @@ h2,
 .candidate__basis,
 .duration__label,
 .mode-card__title,
-.scenario-card__phrase {
+.mode-card__desc,
+.scenario-card__phrase,
+.hero__subtitle,
+.hero__question,
+.hero__lead,
+.prompt {
   word-break: auto-phrase;
   text-wrap: balance;
 }
@@ -628,6 +647,15 @@ h1:focus {
   border-color: var(--chart-b);
 }
 
+.mode-card--context:hover {
+  border-color: var(--chart-s1);
+}
+
+.mode-card--context .mode-card__icon {
+  background: var(--chart-s1-soft);
+  color: var(--color-s1-strong);
+}
+
 .mode-card__icon {
   grid-area: icon;
   display: grid;
@@ -766,6 +794,21 @@ h1:focus {
   color: var(--color-a-strong);
 }
 
+.turn-badge--s1 {
+  background: var(--chart-s1-soft);
+  color: var(--color-s1-strong);
+}
+
+.turn-badge--s2 {
+  background: var(--chart-s2-soft);
+  color: var(--color-s2-strong);
+}
+
+.turn-badge--s3 {
+  background: var(--chart-s3-soft);
+  color: var(--color-s3-strong);
+}
+
 .turn-badge--b {
   background: var(--chart-b-soft);
   color: var(--color-b-strong);
@@ -822,6 +865,24 @@ h1:focus {
   --tone: var(--chart-b);
   --tone-soft: var(--chart-b-soft);
   --tone-text: var(--color-b-strong);
+}
+
+.duration--s1 {
+  --tone: var(--chart-s1);
+  --tone-soft: var(--chart-s1-soft);
+  --tone-text: var(--color-s1-strong);
+}
+
+.duration--s2 {
+  --tone: var(--chart-s2);
+  --tone-soft: var(--chart-s2-soft);
+  --tone-text: var(--color-s2-strong);
+}
+
+.duration--s3 {
+  --tone: var(--chart-s3);
+  --tone-soft: var(--chart-s3-soft);
+  --tone-text: var(--color-s3-strong);
 }
 
 .duration--invalid {
@@ -1235,6 +1296,63 @@ h1:focus {
   color: var(--color-muted);
 }
 
+.chart__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  color: var(--color-common-text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.chart__legend-swatch {
+  flex: none;
+  width: 1.1rem;
+  height: 0.8rem;
+  border: 1px solid var(--chart-common);
+  border-radius: 3px;
+  background: var(--color-common-band);
+}
+
+/* 「場面を変えて比べる」の結果：場面ごとの回答の一覧 */
+.scene-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-facts__item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 5px solid var(--chart-s1);
+  border-radius: 6px;
+  background: var(--color-surface-2);
+}
+
+.scene-facts__item--s2 {
+  border-left-color: var(--chart-s2);
+  border-left-style: double;
+}
+
+.scene-facts__item--s3 {
+  border-left-color: var(--chart-s3);
+  border-left-style: dotted;
+}
+
+.scene-facts__name {
+  font-weight: 700;
+}
+
+.scene-facts__range {
+  font-weight: 800;
+}
+
 .chart__status {
   margin: var(--space-1) 0 0;
   color: var(--color-muted);
@@ -1366,6 +1484,18 @@ h1:focus {
   fill: var(--color-b-text);
 }
 
+.timeline__label--s1 {
+  fill: var(--color-s1-strong);
+}
+
+.timeline__label--s2 {
+  fill: var(--color-s2-strong);
+}
+
+.timeline__label--s3 {
+  fill: var(--color-s3-strong);
+}
+
 .timeline__range {
   fill: var(--color-text);
   font-size: 13px;
@@ -1384,6 +1514,16 @@ h1:focus {
 
 .timeline__bar--b {
   stroke: var(--chart-b);
+  stroke-width: 1;
+}
+
+.timeline__bar--s2 {
+  stroke: var(--chart-s2);
+  stroke-width: 1;
+}
+
+.timeline__bar--s3 {
+  stroke: var(--chart-s3);
   stroke-width: 1;
 }
 

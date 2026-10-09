@@ -13,6 +13,8 @@ interface SessionScreensProps {
   readonly state: SessionState
   readonly dispatch: Dispatch<SessionEvent>
   readonly catalog: SessionCatalog
+  /** スタート画面から「場面を変えて比べる」を始める（別の体験。このセッションの状態は変えない） */
+  readonly onStartContext?: () => void
 }
 
 function missing(what: string): never {
@@ -23,10 +25,15 @@ function missing(what: string): never {
  * state.step に応じて画面を1つ描画する。
  * 各画面には views.ts で選んだ情報だけを渡す（B の入力画面に A の回答は渡らない）。
  */
-export function SessionScreens({ state, dispatch, catalog }: SessionScreensProps) {
+export function SessionScreens({ state, dispatch, catalog, onStartContext }: SessionScreensProps) {
   switch (state.step) {
     case 'HOME':
-      return <HomeScreen onSelectMode={(mode) => dispatch({ type: 'SELECT_MODE', mode })} />
+      return (
+        <HomeScreen
+          onSelectMode={(mode) => dispatch({ type: 'SELECT_MODE', mode })}
+          onStartContext={onStartContext}
+        />
+      )
 
     case 'SCENARIO_SELECT':
       return (

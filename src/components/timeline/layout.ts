@@ -18,10 +18,16 @@ const TICK_SPACING = 72
 /** これより細い帯は全体表示では見えにくいので拡大表示を案内する（px） */
 export const TINY_BAR_WIDTH = 4
 
+/**
+ * 段の種類。a・b は2人の比較（A＝塗り、B＝斜線）。
+ * s1〜s3 は「場面を変えて比べる」の3場面（A・B と混同しないよう、別の色と線種を使う）
+ */
+export type TimelineVariant = 'a' | 'b' | 's1' | 's2' | 's3'
+
 export interface TimelineRowInput {
   readonly label: string
   readonly range: TimeRange
-  readonly variant: 'a' | 'b'
+  readonly variant: TimelineVariant
 }
 
 export interface TimelineLayoutInput {
@@ -31,6 +37,11 @@ export interface TimelineLayoutInput {
   readonly rows: readonly TimelineRowInput[]
   readonly comparison?: ComparisonResult | null
   /**
+   * 3つ以上の範囲の共通部分（「場面を変えて比べる」用）。comparison がないときに使う。
+   * 2つの範囲の比較では comparison.intersection を使う
+   */
+  readonly common?: TimeRange | null
+  /**
    * true のとき、各段の下に「重ね合わせ」の段を加え、2人の範囲を同じ高さに重ねて描く。
    * 座標は上の段と同じ scale で計算する（位置・幅は変えない）。
    */
@@ -39,7 +50,7 @@ export interface TimelineLayoutInput {
 
 export interface TimelineBar {
   readonly label: string
-  readonly variant: 'a' | 'b'
+  readonly variant: TimelineVariant
   readonly labelY: number
   readonly barY: number
   readonly barHeight: number
@@ -148,7 +159,7 @@ export function buildTimelineLayout(input: TimelineLayoutInput): TimelineLayout 
       : null
 
   let intersection: TimelineMark | null = null
-  const common = input.comparison?.intersection ?? null
+  const common = input.comparison?.intersection ?? input.common ?? null
   if (common !== null) {
     const projected = projectRange(scale, common)
     if (projected !== null) {

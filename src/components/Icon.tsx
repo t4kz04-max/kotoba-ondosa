@@ -15,6 +15,7 @@ const PATHS = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   home: 'M4 11l8-7 8 7M6 9.5V20h12V9.5',
+  layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
 } as const
 
 export type IconName = keyof typeof PATHS

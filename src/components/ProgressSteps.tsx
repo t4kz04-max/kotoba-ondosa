@@ -23,10 +23,15 @@ function itemClass(index: number, current: number): string {
 export function ProgressSteps({ step }: { readonly step: SessionStep }) {
   const current = STEP_INDEX[step]
   if (current === null) return null
+  return <StepIndicator labels={LABELS} current={current} />
+}
+
+/** 進み具合の表示。「場面を変えて比べる」でも使う（数字の「1 / 4」は使わず、言葉で示す） */
+export function StepIndicator({ labels, current }: { readonly labels: readonly string[]; readonly current: number }) {
   return (
     <nav aria-label="進み具合" className="progress-nav">
       <ol className="progress">
-        {LABELS.map((label, index) => (
+        {labels.map((label, index) => (
           <li key={label} className={itemClass(index, current)} aria-current={index === current ? 'step' : undefined}>
             <span className="progress__dot" aria-hidden="true" />
             {label}

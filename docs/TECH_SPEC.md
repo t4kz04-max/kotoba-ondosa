@@ -20,6 +20,7 @@ src/
 ├── app/
 │   ├── App.tsx                  ③  # useReducer・ヘッダー・進行表示・ErrorBoundary
 │   ├── SessionScreens.tsx       ③  # state.step に応じて画面を1つ描画。views.ts の結果だけを各画面へ渡す
+│   ├── ContextScreens.tsx       6A  # 「場面を変えて比べる」の画面の切り替え
 │   ├── ErrorBoundary.tsx        ③  # 予期しないエラー時の表示
 │   └── appInfo.ts                   # 作品名・副題
 ├── domain/                          # React 非依存の純粋関数
@@ -30,11 +31,14 @@ src/
 │   ├── agreement.ts             ②  # 具体化の候補・文型・実行可能性の問い
 │   ├── scale.ts                 ②③ # 線形時間軸の座標計算・目盛り・拡大表示の範囲（computeZoomView は ③）
 │   ├── session.ts               ②  # SessionState / SessionEvent / transition / createSessionReducer
-│   └── views.ts                 ②  # 画面に渡す情報の選択（selectInputView など）
+│   ├── views.ts                 ②  # 画面に渡す情報の選択（selectInputView など）
+│   ├── contextSession.ts        6A  # 「場面を変えて比べる」の状態と遷移（既存セッションとは独立）
+│   └── contextCompare.ts        6A  # 3区間の共通部分・一致・説明文
 ├── data/
 │   ├── scenarios.ts             ②  # 3シナリオ
 │   ├── samples.ts               ②  # 架空のサンプル回答（冒頭コメントで架空と明記）
-│   └── catalog.ts               ②  # defaultCatalog（scenarios + samples）
+│   ├── catalog.ts               ②  # defaultCatalog（scenarios + samples）
+│   └── contextScenes.ts         6A  # 「場面を変えて比べる」の3場面と共通設定
 ├── components/                      # 画面をまたいで使う部品（③）
 │   ├── AppHeader.tsx                # 作品名・「最初から」
 │   ├── ProgressSteps.tsx            # えらぶ → こたえる → くらべる → ことばにする
@@ -46,12 +50,17 @@ src/
 │   └── timeline/
 │       ├── TimelineChart.tsx        # SVG の描画のみ（入力プレビューと比較で共用）。5A で重ね合わせの段・公開演出
 │       ├── ComparisonChart.tsx      # 全体表示／拡大表示の切り替えと表示範囲の明記
+│       ├── ContextChart.tsx     6A  # 3場面の図（全体表示／拡大表示、共通部分）
+│       ├── sceneStyle.ts        6A  # 場面の線種（s1〜s3）と丸数字
 │       └── layout.ts                # 図の座標計算（scale.ts を使う純粋関数）
 ├── features/                        # 画面単位（③）
 │   ├── home/HomeScreen.tsx
 │   ├── scenario-select/ScenarioSelectScreen.tsx
 │   ├── input/InputScreen.tsx
 │   ├── input/inputMessages.ts       # validateDraft のエラー → 表示文
+│   ├── input/RangeInputPanel.tsx 6A # 早くて／遅くて・エラー・プレビュー（入力画面と場面の入力で共用）
+│   ├── context/ContextInputScreen.tsx  6A
+│   ├── context/ContextResultScreen.tsx 6A
 │   ├── handoff/HandoffScreen.tsx    # HANDOFF と READY_TO_REVEAL（回答を受け取らない）
 │   ├── comparison/ComparisonScreen.tsx
 │   ├── agreement/AgreementScreen.tsx
@@ -97,6 +106,7 @@ tests/
 - 状態遷移は `src/domain/session.ts` の純粋関数 `transition` で行う。不正な遷移は拒否され、state は変わらない。
 - `useReducer` には `createSessionReducer(catalog)` を使う。拒否時は同じ state オブジェクトが返るため再描画されない。開発時に拒否理由を確認したい場合は `transition` を直接呼ぶ。
 - 比較結果・説明文・候補は state に保存せず、`views.ts` の関数で描画時に計算する（派生値）。
+- 「場面を変えて比べる」（Phase 6A）は別の `ContextState`（`src/domain/contextSession.ts`）を `App` のもう1つの `useReducer` で持つ。どちらの体験を表示するかは `App` の `experience`（'compare' | 'context'）で切り替え、既存の `SessionState` と遷移は変更しない。「最初から」は両方をリセットする。
 - 状態管理ライブラリ、ルーターは使わない。
   - ルーターを使わない理由：URL で画面を直接開けると、ふたりモードで相手の回答が見える経路ができるため。
 

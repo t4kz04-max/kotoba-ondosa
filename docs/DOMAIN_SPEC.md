@@ -413,3 +413,56 @@ createSessionReducer(catalog): (state, event) => state   // useReducer 用
 | `tests/domain/session.test.ts` | 両モードの全体の流れ、未入力回答の確定拒否、不正な遷移、INPUT_B → INPUT_A 不可、実行可能性の確認、リセット・やり直し |
 | `tests/domain/views.test.ts` | B の入力画面に A の回答が含まれないこと、公開前に比較が出ないこと |
 | `tests/data/catalog.test.ts` | シナリオの最大値・刻み、サンプルの件数・有効性・架空フラグ |
+
+## 12. 場面を変えて比べる（Phase 6A）
+
+既存の2区間の比較（§5〜§8）には手を入れず、別の純粋関数と状態として追加した。
+
+### 12.1 場面データ（`src/data/contextScenes.ts`）
+
+| 番号 | id | 言葉 | 場面 | 終点 |
+|---|---|---|---|---|
+| ① | `tell-friend` | すぐ行く | 待ち合わせをしている友だちに「すぐ行く」と伝えた | 行くために動き出す |
+| ② | `reply-message` | すぐ返信する | 友だちからのメッセージに「すぐ返信する」と伝えた | 返信を書き始める |
+| ③ | `start-homework` | すぐ始める | 家の人に、宿題を「すぐ始める」と伝えた | 宿題を始める |
+
+- 共通設定（`CONTEXT_SETTINGS`）：起点「言葉を伝えた」（0秒）、上限 1800秒（30分）、スライダーの刻み 60秒。数値入力は「分・秒」（`unitsFor`）。
+- 既存シナリオ `sugu-iku` は終点が「友だちが着く」・上限60分で、測るものが違う。混ぜないため別に定義した。
+
+### 12.2 入力と状態（`src/domain/contextSession.ts`）
+
+```ts
+interface ContextState {
+  step: 'INPUT' | 'RESULT'
+  index: number                     // 答えている場面（0〜2）
+  draft: RangeDraft                 // 初期値は未入力
+  answers: (TimeRange | null)[]     // 確定した回答
+}
+type ContextEvent = SET_DRAFT | SUBMIT_ANSWER | BACK | RETRY
+```
+
+- `SUBMIT_ANSWER` は既存の `validateDraft(draft, 1800)` で検証し、不正なら拒否（state は変わらない）。最後の場面のあとは `RESULT`。
+- 次の場面の入力欄は空（前の回答を引き継がない）。`BACK` で前の場面に戻ると、その場面の回答を入力欄に戻す。最初の場面の `BACK` は拒否し、App がスタート画面へ戻す。
+- `RETRY` は初期状態へ。App の「最初から」は既存セッションと両方をリセットする。
+
+### 12.3 3区間の比較（`compareContextRanges`）
+
+範囲は検証済み（0 ≤ start ≤ end ≤ 上限の整数秒）を前提とする。
+
+- 共通部分：`commonMin = max(各 start)`、`commonMax = min(各 end)`。`commonMin <= commonMax` のときだけ `{ start: commonMin, end: commonMax }`、それ以外は `null`。2区間ずつの `intersectRanges` を重ねた結果と一致する（テストで全組み合わせを確認）。
+- `commonIsPoint`：共通部分があり `commonMin === commonMax`。
+- `allIdentical`：すべての start と end がそれぞれ等しい。**共通部分があっても一致とは限らない**（例：0〜30分・5〜10分・5〜10分は共通 5〜10分だが一致ではない）。
+- まんなか（`midpoint`）が最も早い／遅い場面の番号（同じ値ならすべて）と、その差 `midpointSpread`。
+
+### 12.4 説明文（`describeContextComparison`）
+
+| 条件 | 文 |
+|---|---|
+| allIdentical | 見出し「3つの場面で、あなたの「すぐ」は同じでした」。「3つの場面で、選んだ時間が同じでした。」「どの場面も◯でした。」 |
+| それ以外 | 見出し「場面によって、あなたの「すぐ」の範囲が違いました」。「場面によって、選んだ時間の範囲が違いました。」 |
+| 共通部分あり | 「3つの場面に共通する時間があります。共通するのは◯〜◯です。」 |
+| 共通が1点 | 「3つの場面に共通する時間があります。共通するのは、ちょうど◯の1点です。」 |
+| 共通なし | 「3つすべてに共通する時間はありません。」 |
+| まんなか | 同じなら「範囲のまんなかは、どの場面も同じでした。」、違えば「範囲のまんなかがいちばん早いのは「◯」、いちばん遅いのは「◯」で、◯ちがいます。」 |
+
+性格・正しさ・誤解・割合・「必ず」などの語を使わない（テストで確認）。
