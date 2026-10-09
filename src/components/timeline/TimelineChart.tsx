@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { formatDuration, formatRange } from '../../domain/format'
 import type { ComparisonResult, TimeRange } from '../../domain/types'
 import { useElementWidth } from '../../hooks/useElementWidth'
@@ -16,6 +16,11 @@ interface TimelineChartProps {
   readonly overlay?: { readonly label: string; readonly summary: string }
   /** 範囲がまだないときに、空の帯の上に出す文 */
   readonly emptyLabel?: string
+  /**
+   * B の範囲を表すキー（サンプルの切り替えで変わる）。変わったときは、B の段と比較の印だけを短いフェードで描き直す。
+   * 位置を補間するアニメーションはしない（途中の形が、存在しない重なりや距離に見えないようにするため）
+   */
+  readonly swapKey?: string
   /** 公開演出（段ごとに順に表示する）。prefers-reduced-motion では CSS 側で止める */
   readonly animate?: boolean
 }
@@ -73,7 +78,7 @@ function BarShape({ bar, fill, className }: ShapeProps) {
  * 線形の時間軸に範囲を描く。座標計算は layout.ts（domain/scale.ts）に任せ、ここでは描画だけを行う。
  * A は塗りつぶし、B は斜線で、色以外でも区別する。
  */
-export function TimelineChart({ view, rows, comparison, description, showZoomHint, overlay, emptyLabel, animate }: TimelineChartProps) {
+export function TimelineChart({ view, rows, comparison, description, showZoomHint, overlay, emptyLabel, swapKey, animate }: TimelineChartProps) {
   const [containerRef, width] = useElementWidth<HTMLDivElement>(320)
   const idBase = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const hatchId = `hatch-${idBase}`
@@ -81,6 +86,18 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
   const { intersection, gap } = layout
   const fillFor = (variant: 'a' | 'b') => (variant === 'a' ? 'var(--chart-a)' : `url(#${hatchId})`)
   const marksBottom = layout.overlay === null ? null : layout.overlay.barY + layout.overlay.barHeight
+
+  // 表示範囲（scale）と B の範囲のキー。変わった部分だけを作り直し、2回目以降はフェードで現れるようにする
+  const viewKey = `${view.start}-${view.end}`
+  const bKey = `${swapKey ?? ''}|${viewKey}`
+  const [prev, setPrev] = useState({ viewKey, bKey })
+  const [changed, setChanged] = useState({ view: false, b: false })
+  if (prev.viewKey !== viewKey || prev.bKey !== bKey) {
+    setPrev({ viewKey, bKey })
+    setChanged({ view: changed.view || prev.viewKey !== viewKey, b: true })
+  }
+  const swapA = changed.view ? ' timeline__swap' : ''
+  const swapB = changed.b ? ' timeline__swap' : ''
 
   return (
     <div ref={containerRef} className={animate === true ? 'timeline timeline--reveal' : 'timeline'}>
@@ -101,7 +118,7 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
 
         {/* 共通範囲：段をまたぐ縦の帯（下地） */}
         {intersection !== null && !intersection.isPoint && (
-          <g className="timeline__marks">
+          <g key={`band-${bKey}`} className={`timeline__marks${swapB}`}>
             <rect
               x={intersection.x1}
               y={intersection.top}
@@ -129,7 +146,10 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
         )}
 
         {layout.bars.map((bar, index) => (
-          <g key={index} className={`timeline__row timeline__row--${bar.variant}`}>
+          <g
+            key={`${index}-${index === 0 ? viewKey : bKey}`}
+            className={`timeline__row timeline__row--${bar.variant}${index === 0 ? swapA : swapB}`}
+          >
             <rect
               x={layout.plotLeft}
               y={bar.barY}
@@ -149,7 +169,7 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
         ))}
 
         {layout.overlay !== null && overlay !== undefined && (
-          <g className="timeline__overlay">
+          <g key={`overlay-${bKey}`} className={`timeline__overlay${swapB}`}>
             <rect
               x={layout.plotLeft}
               y={layout.overlay.barY}
@@ -192,7 +212,7 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
 
         {intersection !== null && intersection.isPoint && (
           // 1点だけの共通点は、幅を持たせず縦線と丸で示す
-          <g className="timeline__point timeline__marks">
+          <g key={`point-${bKey}`} className={`timeline__point timeline__marks${swapB}`}>
             <line x1={intersection.x1} x2={intersection.x1} y1={intersection.top} y2={intersection.bottom} />
             <circle
               cx={intersection.x1}
@@ -203,7 +223,7 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
         )}
 
         {gap !== null && (
-          <g className="timeline__gap timeline__marks">
+          <g key={`gap-${bKey}`} className={`timeline__gap timeline__marks${swapB}`}>
             {marksBottom !== null && (
               <>
                 <line className="timeline__guide" x1={gap.x1} x2={gap.x1} y1={layout.bars[0].barY} y2={marksBottom} />
@@ -221,7 +241,7 @@ export function TimelineChart({ view, rows, comparison, description, showZoomHin
           </g>
         )}
 
-        <g className="timeline__axis">
+        <g key={`axis-${viewKey}`} className={`timeline__axis${swapA}`}>
           <line x1={layout.plotLeft} x2={layout.plotRight} y1={layout.axisY} y2={layout.axisY} />
           {layout.ticks.map((tick) => (
             <g key={tick.x}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { formatRange } from '../../domain/format'
 import type { Mode } from '../../domain/types'
@@ -19,13 +19,25 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
   const headingRef = useFocusHeading()
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
   const text = agreement.text ?? ''
+  const textRef = useRef<HTMLSpanElement>(null)
 
+  /** 失敗したときは、自分でコピーできるように文を選んだ状態にする */
+  const selectText = () => {
+    const element = textRef.current
+    const selection = typeof window === 'undefined' ? null : window.getSelection()
+    if (element === null || selection === null) return
+    selection.selectAllChildren(element)
+  }
+
+  // コピーするのは画面に出ている文そのもの（かぎかっこは飾りなので含めない）
   const copy = async () => {
     try {
+      if (typeof navigator === 'undefined' || navigator.clipboard === undefined) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(text)
       setCopyStatus('copied')
     } catch {
       setCopyStatus('failed')
+      selectText()
     }
   }
 
@@ -42,7 +54,13 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
             ↓
           </p>
           <p className="promise__label">{mode === 'duo' ? '2人で具体化した言葉' : 'あなたが具体化した言葉'}</p>
-          <p className="promise__text">「{text}」</p>
+          <p className="promise__text">
+            <span aria-hidden="true">「</span>
+            <span ref={textRef} className="promise__sentence">
+              {text}
+            </span>
+            <span aria-hidden="true">」</span>
+          </p>
         </div>
         {mode === 'duo' ? (
           <p className="promise__confirmed">
@@ -60,8 +78,8 @@ export function CompleteScreen({ comparison, agreement, mode, onReset, onRestart
             この言葉をコピー
           </button>
           <p className="note" aria-live="polite">
-            {copyStatus === 'copied' && 'コピーしました。'}
-            {copyStatus === 'failed' && 'コピーできませんでした。文字を選んでコピーしてください。'}
+            {copyStatus === 'copied' && `「${text}」をコピーしました。`}
+            {copyStatus === 'failed' && 'コピーできませんでした。言葉を選んだので、長押しや Ctrl＋C でコピーしてください。'}
           </p>
         </div>
       </div>

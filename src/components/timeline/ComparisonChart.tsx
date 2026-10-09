@@ -64,6 +64,7 @@ export function ComparisonChart({ scenario, a, b, result, description, animate }
         description={[description.headline, ...description.details].join(' ')}
         showZoomHint={mode === 'full'}
         overlay={{ label: '重ねると', summary: overlaySummary(result) }}
+        swapKey={`${b.label}|${b.range.start}-${b.range.end}`}
         animate={animate}
       />
       <p className="chart__status" aria-live="polite">

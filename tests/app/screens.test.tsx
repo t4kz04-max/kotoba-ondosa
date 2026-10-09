@@ -107,6 +107,11 @@ describe('input screen', () => {
     expect(html.match(/aria-invalid="true"/g)?.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('shows a single-field error right under that field', () => {
+    const html = render(run([...SOLO_COMPARISON.slice(0, 2), { type: 'SET_DRAFT', draft: { start: 4000, end: 300 } }]))
+    expect(html).toMatch(/<p id="[^"]*-error" class="duration__error"[^>]*>このアプリでは1時間までで答えます/)
+  })
+
   it('states that the max is not the limit of the meaning', () => {
     expect(textOf(render(atInput))).toContain('より長いと感じる人もいます')
   })
@@ -195,6 +200,17 @@ describe('comparison screen', () => {
     expect(text).toContain('共通 15分（1点だけ）')
   })
 
+  it('has exactly one primary action, kept in the bottom action bar', () => {
+    const html = render(run(SOLO_COMPARISON))
+    expect(html.match(/具体的な言葉にする/g)).toHaveLength(1)
+    expect(html).toMatch(/<div class="action-bar action-bar--single"><button[^>]*>具体的な言葉にする<\/button><\/div>/)
+  })
+
+  it('shows the headline from the start of the reveal (not delayed to the end)', () => {
+    const html = render(run(SOLO_COMPARISON))
+    expect(html).toMatch(/<h1[^>]*class="result-headline reveal__step reveal__step--1"/)
+  })
+
   it('renders an accessible SVG chart', () => {
     const html = render(run(SOLO_COMPARISON))
     expect(html).toMatch(/<svg[^>]*role="img"[^>]*aria-label="2人の「すぐ行く」は重なりませんでした/)
@@ -254,11 +270,11 @@ describe('agreement screen', () => {
       { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
     ]
     const approvedA = textOf(render(run(duoAgreement)))
-    expect(approvedA).toContain('Aさん：承認しました')
+    expect(approvedA).toContain('Aさん：確認しました')
     expect(approvedA).toContain('Bさん OK')
 
     const changed = textOf(render(run([...duoAgreement, { type: 'CHOOSE_AGREEMENT_TIME', seconds: 1200 }])))
-    expect(changed).not.toContain('承認しました')
+    expect(changed).not.toContain('確認しました')
     expect(changed).toContain('Aさん OK')
     expect(changed).toContain('20分以内に行くね')
   })
@@ -266,18 +282,19 @@ describe('agreement screen', () => {
 
 describe('complete screen', () => {
   it('shows the promise and restart options', () => {
-    const text = textOf(
-      render(
-        run([
-          ...SOLO_COMPARISON,
-          { type: 'START_AGREEMENT' },
-          { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 },
-          { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
-        ]),
-      ),
+    const html = render(
+      run([
+        ...SOLO_COMPARISON,
+        { type: 'START_AGREEMENT' },
+        { type: 'CHOOSE_AGREEMENT_TIME', seconds: 600 },
+        { type: 'APPROVE_AGREEMENT', participant: 'A', feasibilityConfirmed: true },
+      ]),
     )
+    const text = textOf(html)
     expect(text).toContain('ことばが、約束になった。')
-    expect(text).toContain('「10分以内に行くね」')
+    expect(text).toContain('「 10分以内に行くね 」')
+    // コピーされる文（promise__sentence）は、かぎかっこを含まない画面上の文そのもの
+    expect(html).toContain('<span class="promise__sentence">10分以内に行くね</span>')
     expect(text).toContain('最初から')
     expect(text).toContain('ほかの言葉でくらべる')
     expect(text).toContain('この言葉をコピー')

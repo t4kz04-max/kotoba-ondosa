@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { DurationInput } from '../../components/duration-input/DurationInput'
 import { TimelineChart } from '../../components/timeline/TimelineChart'
 import { formatDuration, formatRange } from '../../domain/format'
-import { validateDraft } from '../../domain/range'
+import { validateDraft, type RangeValidationError } from '../../domain/range'
 import type { RangeDraft, Seconds } from '../../domain/types'
 import type { InputView } from '../../domain/views'
 import { useFocusHeading } from '../../hooks/useFocusHeading'
@@ -27,12 +27,14 @@ function whoseTurn(view: InputView): string {
 }
 
 /**
- * 1つの欄だけの値に問題があるか。範囲全体の検証と同じ validateDraft を、その値だけの範囲に使って調べる。
- * （どの欄を直せばよいかを枠の色と aria-invalid で示すため。エラー文は範囲全体の検証結果から出す）
+ * 1つの欄だけの値の問題（数字以外・負の値・上限超過）。範囲全体の検証と同じ validateDraft を、
+ * その値だけの範囲に使って調べる。問題がなければ null。
+ * （どの欄を直せばよいかを、その欄のすぐ下の文・枠の色・aria-invalid で示すため）
  */
-function fieldHasError(value: Seconds | null, maxSeconds: Seconds): boolean {
-  if (value === null) return false
-  return !validateDraft({ start: value, end: value }, maxSeconds).ok
+function fieldError(value: Seconds | null, maxSeconds: Seconds): RangeValidationError | null {
+  if (value === null) return null
+  const result = validateDraft({ start: value, end: value }, maxSeconds)
+  return result.ok ? null : (result.errors.find((error) => error !== 'incomplete') ?? null)
 }
 
 export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScreenProps) {
@@ -43,6 +45,12 @@ export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScre
   const errors = validation.ok ? [] : validation.errors.filter((error) => error !== 'incomplete')
   const incomplete = !validation.ok && validation.errors.includes('incomplete')
   const reversed = errors.includes('start-after-end')
+  const startError = fieldError(draft.start, scenario.maxSeconds)
+  const endError = fieldError(draft.end, scenario.maxSeconds)
+  // 欄の下に出したエラーは、まとめの欄ではくり返さない
+  const sharedErrors = errors.filter((error) => error !== startError && error !== endError)
+  const messageFor = (error: RangeValidationError | null) =>
+    error === null ? undefined : inputErrorMessage(error, scenario.maxSeconds)
   const tone = view.participant === 'A' ? 'a' : 'b'
   const who = answererLabel(view)
 
@@ -67,7 +75,7 @@ export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScre
       <div className="range-inputs">
         <DurationInput
           label="早くて"
-          hint="範囲の始まり"
+          hint="いちばん早い時間"
           value={draft.start}
           onChange={setStart}
           maxSeconds={scenario.maxSeconds}
@@ -75,12 +83,13 @@ export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScre
           stepSeconds={scenario.inputStepSeconds}
           describedBy={messageId}
           tone={tone}
-          invalid={reversed || fieldHasError(draft.start, scenario.maxSeconds)}
+          invalid={reversed || startError !== null}
+          error={messageFor(startError)}
           zeroShortcut
         />
         <DurationInput
           label="遅くて"
-          hint="範囲の終わり"
+          hint="いちばん遅い時間"
           value={draft.end}
           onChange={setEnd}
           maxSeconds={scenario.maxSeconds}
@@ -88,7 +97,8 @@ export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScre
           stepSeconds={scenario.inputStepSeconds}
           describedBy={messageId}
           tone={tone}
-          invalid={reversed || fieldHasError(draft.end, scenario.maxSeconds)}
+          invalid={reversed || endError !== null}
+          error={messageFor(endError)}
         />
       </div>
 
@@ -110,7 +120,7 @@ export function InputScreen({ view, onChangeDraft, onSubmit, onBack }: InputScre
                   まだ選んでいない項目があります。{inputErrorMessage('incomplete', scenario.maxSeconds)}
                 </p>
               )}
-              {errors.map((error) => (
+              {sharedErrors.map((error) => (
                 <p key={error} className="error">
                   {inputErrorMessage(error, scenario.maxSeconds)}
                 </p>

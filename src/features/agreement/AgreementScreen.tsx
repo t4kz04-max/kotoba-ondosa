@@ -59,7 +59,7 @@ function CustomTime({ comparison, onChoose }: { readonly comparison: ComparisonV
     <div className="custom-time">
       <DurationInput
         label="ほかの時間"
-        hint="手がかり以外の時間にする"
+        hint="手がかり以外の時間を選ぶ"
         value={value}
         onChange={setValue}
         maxSeconds={scenario.maxSeconds}
@@ -84,10 +84,10 @@ function ApprovalPanel({ agreement, mode, onApprove }: Pick<AgreementScreenProps
   const [checked, setChecked] = useState<Partial<Record<ParticipantId, boolean>>>({})
   return (
     <div className="card approval">
-      <p className="section-label">{mode === 'solo' ? '実行できるかの確認' : '2人の確認'}</p>
+      <p className="section-label">{mode === 'solo' ? '本当にできるか確かめよう' : '2人で確かめよう'}</p>
       <h2>{agreement.feasibilityQuestion}</h2>
       <p className="note">
-        「当てはまると感じる時間」と「実際にできる時間」は別です。この時間で本当にできるか、確かめてから承認してください。
+        「そう感じる時間」と「本当にできる時間」は別です。できると思えたら、チェックして OK を押してね。
       </p>
       {mode === 'solo' && <p className="note">今回の相手は架空のサンプルなので、確認するのはあなただけです。</p>}
       <div className="approvers">
@@ -98,7 +98,7 @@ function ApprovalPanel({ agreement, mode, onApprove }: Pick<AgreementScreenProps
             return (
               <p key={participant} className={`approver approver--${tone} approver--done`}>
                 <Icon name="check" size={20} />
-                {name}：承認しました
+                {name}：確認しました
               </p>
             )
           }
@@ -154,7 +154,7 @@ export function AgreementScreen(props: AgreementScreenProps) {
       <div className="card candidates">
         <h2>2人の感じ方からの手がかり</h2>
         <p className="note">
-          手がかりは、2人が「当てはまる」と感じた時間から出したものです。その時間で本当にできるかは、別に確かめてください。どれにするかは自分たちで決めてください。
+          2人の答えから出した時間です。どれにするかは自分たちで決めよう。手がかりは約束ではないので、本当にできるかは次で確かめます。
         </p>
         {comparison.result.intersection === null && (
           <p className="note">2人の範囲は重なっていないため、共通範囲からの手がかりはありません。</p>

@@ -26,6 +26,8 @@ interface DurationInputProps {
   readonly tone?: 'a' | 'b' | 'neutral'
   /** この欄の値に問題があるとき true（枠を強調し、aria-invalid を付ける） */
   readonly invalid?: boolean
+  /** この欄だけの問題を、欄のすぐ下に出す文（範囲全体の問題は呼び出し側で表示する） */
+  readonly error?: string
   /** 「0分にする」ボタンを出す（スライダーの初期位置と同じ 0 を選びやすくするため） */
   readonly zeroShortcut?: boolean
 }
@@ -45,6 +47,7 @@ export function DurationInput({
   describedBy,
   tone = 'neutral',
   invalid = false,
+  error,
   zeroShortcut = false,
 }: DurationInputProps) {
   const id = useId()
@@ -52,6 +55,8 @@ export function DurationInput({
   const [fields, setFields] = useState<FieldTexts>(() => secondsToFields(value, units))
   const isSet = value !== null && Number.isFinite(value)
   const isNotNumber = value !== null && !Number.isFinite(value)
+  const errorId = `${id}-error`
+  const describedByAll = [error !== undefined ? errorId : undefined, describedBy].filter(Boolean).join(' ') || undefined
 
   const setFromSlider = (seconds: Seconds) => {
     setFields(secondsToFields(seconds, units))
@@ -90,7 +95,7 @@ export function DurationInput({
         value={sliderValue}
         aria-label={`${label}（スライダー）`}
         aria-valuetext={isSet ? formatDuration(value) : '未選択'}
-        aria-describedby={describedBy}
+        aria-describedby={describedByAll}
         onChange={(event) => setFromSlider(Number(event.target.value))}
       />
       <div className="duration__scale" aria-hidden="true">
@@ -109,7 +114,7 @@ export function DurationInput({
               value={fields[unit] ?? ''}
               placeholder="—"
               aria-label={`${label}の${UNIT_LABELS[unit]}`}
-              aria-describedby={describedBy}
+              aria-describedby={describedByAll}
               aria-invalid={invalid || undefined}
               onChange={(event) => handleField(unit, event.target.value)}
             />
@@ -123,6 +128,9 @@ export function DurationInput({
           </button>
         )}
       </div>
+      <p id={errorId} className="duration__error" aria-live="polite">
+        {error}
+      </p>
     </fieldset>
   )
 }

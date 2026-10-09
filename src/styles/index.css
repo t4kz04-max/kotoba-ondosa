@@ -95,6 +95,22 @@ body {
   overflow-wrap: anywhere;
 }
 
+/*
+ * 見出しや大きな文は、日本語の文節の切れ目で改行する（Chrome・Edge の auto-phrase。
+ * 対応していないブラウザでは通常の改行になる）
+ */
+h1,
+h2,
+.promise__text,
+.sentence-card__text,
+.candidate__basis,
+.duration__label,
+.mode-card__title,
+.scenario-card__phrase {
+  word-break: auto-phrase;
+  text-wrap: balance;
+}
+
 h1 {
   font-size: clamp(1.45rem, 1.15rem + 1.5vw, 2rem);
   font-weight: 800;
@@ -152,7 +168,8 @@ h1:focus {
   max-width: 46rem;
   min-height: 3.5rem;
   margin: 0 auto;
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-1) max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-1)
+    max(var(--space-4), env(safe-area-inset-left, 0px));
 }
 
 .brand {
@@ -176,7 +193,21 @@ h1:focus {
 .app__body {
   max-width: 46rem;
   margin: 0 auto;
-  padding: 0 var(--space-4) var(--space-7);
+  padding: 0 max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-7)
+    max(var(--space-4), env(safe-area-inset-left, 0px));
+}
+
+/* 画面には出さず、スクリーンリーダーだけが読む */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .progress {
@@ -799,6 +830,7 @@ h1:focus {
 
 .duration__legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2);
   float: left;
@@ -811,6 +843,7 @@ h1:focus {
 }
 
 .duration__label {
+  white-space: nowrap;
   font-size: 1.1rem;
   font-weight: 800;
 }
@@ -948,6 +981,21 @@ h1:focus {
   background: var(--color-error-soft);
 }
 
+.duration__error {
+  margin: var(--space-2) 0 0;
+  color: var(--color-error);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.duration__error:empty {
+  margin: 0;
+}
+
+.duration__error:not(:empty)::before {
+  content: '！ ';
+}
+
 .duration__zero {
   margin-left: auto;
 }
@@ -986,6 +1034,25 @@ h1:focus {
 
 .action-bar .button--primary {
   flex: 1;
+}
+
+/* 比較画面：主ボタン1つだけを、すべての幅で画面下に固定する */
+.action-bar--single {
+  justify-content: center;
+}
+
+.action-bar--single .button--primary {
+  max-width: 28rem;
+}
+
+/* 固定バーの下に、フォーカスした入力欄が隠れないようにする */
+.screen--input input,
+.screen--input button {
+  scroll-margin-bottom: 6.5rem;
+}
+
+.screen--comparison :is(button, summary) {
+  scroll-margin-bottom: 6.5rem;
 }
 
 /* ===== 交代・公開前 ===== */
@@ -1633,6 +1700,12 @@ h1:focus {
   text-wrap: balance;
 }
 
+/* タップ1回で文全体を選べるようにする（コピーできない環境のため） */
+.promise__sentence {
+  -webkit-user-select: all;
+  user-select: all;
+}
+
 .promise__confirmed {
   display: inline-flex;
   align-items: center;
@@ -1690,8 +1763,8 @@ h1:focus {
 }
 
 /* ===== 公開演出 =====
- * 順番：①回答の公開（名前と範囲）→ ②A・B の帯 → ③重ね合わせと共通部分／空白 → ④見出しと説明文
- * 全体で約1.7秒。内容は最初から DOM にあるので、演出を見なくても読み上げ・読解できる。
+ * 順番：①何をくらべたか・見出し（最初から読める）→ ②A の帯 → B の帯 → ③重ね合わせと共通部分／空白 → ④説明文
+ * 全体で約1.6秒。ボタンは演出の対象にしない（演出中も見えていて押せる）。内容は最初から DOM にあるので、演出を見なくても読み上げ・読解できる。
  * .reveal（画面）と .timeline--reveal（図）は、同じ回答で初めて表示したときだけ付く（useRevealOnce）。
  */
 
@@ -1699,6 +1772,18 @@ h1:focus {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 見出し用：透明から始めず、少し薄い状態から短く浮き上がる */
+@keyframes reveal-rise {
+  from {
+    opacity: 0.4;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1736,22 +1821,22 @@ h1:focus {
 }
 
 .reveal .reveal__step--1 {
-  animation: reveal-fade-up 350ms ease-out both;
+  animation: reveal-rise 300ms ease-out both;
 }
 
 .reveal .reveal__step--4 {
-  animation: reveal-fade-up 400ms ease-out 1300ms both;
+  animation: reveal-fade-up 400ms ease-out 1200ms both;
 }
 
 /* 帯は左端から伸びる。最終的な幅は線形スケールの値そのもの */
 .timeline--reveal .timeline__row .timeline__bar {
   transform-box: fill-box;
   transform-origin: left center;
-  animation: reveal-grow 500ms cubic-bezier(0.2, 0.8, 0.2, 1) 300ms both;
+  animation: reveal-grow 500ms cubic-bezier(0.2, 0.8, 0.2, 1) 200ms both;
 }
 
 .timeline--reveal .timeline__row--b .timeline__bar {
-  animation-delay: 550ms;
+  animation-delay: 450ms;
 }
 
 /* 長さ0の範囲のマーカーは伸ばさず、その場に現れる */
@@ -1761,11 +1846,19 @@ h1:focus {
 }
 
 .timeline--reveal .timeline__overlay {
-  animation: reveal-fade 350ms ease-out 900ms both;
+  animation: reveal-fade 350ms ease-out 800ms both;
 }
 
 .timeline--reveal .timeline__marks {
-  animation: reveal-fade 400ms ease-out 1100ms both;
+  animation: reveal-fade 400ms ease-out 1000ms both;
+}
+
+/*
+ * サンプル・表示範囲の切り替え：変わった段と印だけを短いフェードで描き直す。
+ * 帯の位置や幅を補間しない（途中の形が、存在しない重なりや距離に見えないようにするため）。
+ */
+.timeline__swap {
+  animation: reveal-fade 220ms ease-out both;
 }
 
 /* ===== 動きを減らす設定 ===== */
@@ -1778,6 +1871,46 @@ h1:focus {
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===== 幅 360px 未満（320px の端末） ===== */
+
+@media (max-width: 359px) {
+  .progress {
+    gap: 2px;
+    font-size: 0.7rem;
+  }
+
+  .progress__item {
+    white-space: nowrap;
+  }
+
+  /* カードの中のカード（候補・ほかの時間）が細くなりすぎないように余白を詰める */
+  .card {
+    padding: var(--space-3);
+  }
+
+  .custom-time .duration,
+  .approver {
+    padding: var(--space-3);
+  }
+
+  .candidate {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'basis'
+      'time'
+      'note';
+    padding: var(--space-3);
+  }
+
+  .promise__title {
+    font-size: 1.35rem;
+  }
+
+  .segmented__button {
+    padding: 0.35rem 0.6rem;
   }
 }
 
@@ -1830,7 +1963,7 @@ h1:focus {
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   }
 
-  .action-bar {
+  .action-bar:not(.action-bar--single) {
     margin: 0;
     padding: var(--space-3) 0;
     border-top: none;
@@ -1839,9 +1972,18 @@ h1:focus {
     position: static;
   }
 
-  .action-bar .button--primary {
+  .action-bar:not(.action-bar--single) .button--primary {
     flex: 0 1 16rem;
     margin-left: auto;
+  }
+
+  .action-bar--single {
+    margin: 0 calc(-1 * var(--space-5));
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+    border-top: none;
+    background: linear-gradient(to top, var(--color-bg) 70%, rgba(250, 249, 245, 0));
+    backdrop-filter: none;
   }
 
   .button-stack {

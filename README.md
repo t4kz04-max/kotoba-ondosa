@@ -12,8 +12,8 @@
 3. 共通点と違いを可視化する
 4. 曖昧な表現を、お互いに確認した具体的な表現へ変換する
 
-> **現在の状態：Phase 5A（UI/UX の本格実装）**
-> ひとりモード・ふたりモードで、最初から最後まで操作できます。Gemini Canvas の試作（Phase 4）を参考にしたデザインと比較結果の公開演出を実装しました。デザインの方針は [docs/UI_DESIGN_SPEC.md](docs/UI_DESIGN_SPEC.md) を参照してください。
+> **現在の状態：Phase 5B（UI/UX の最終調整）**
+> ひとりモード・ふたりモードで、最初から最後まで操作できます。Gemini Canvas の試作（Phase 4）を参考にしたデザインと比較結果の公開演出を実装し、スマートフォンでの操作性を調整しました。デザインの方針は [docs/UI_DESIGN_SPEC.md](docs/UI_DESIGN_SPEC.md) を参照してください。
 > 仕様は [docs/PRD.md](docs/PRD.md) ほか docs/ 内の文書、開発の進め方は [docs/ROADMAP.md](docs/ROADMAP.md) を参照してください。
 
 ## 使用技術
