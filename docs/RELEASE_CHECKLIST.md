@@ -28,7 +28,14 @@
 | 秘密情報・個人情報が含まれない | PASS | 追跡ファイルを走査。`.env` なし、`.gitignore` で除外 |
 | 提出 ZIP に `node_modules` を含めない手順 | PASS | README に記載 |
 | Windows PowerShell の起動手順 | PASS | README に記載（`npm.cmd` の回避策を含む） |
-| Vercel など本番環境へのデプロイ | NOT_TESTED | Phase 8 の作業 |
+| Vercel など本番環境へのデプロイ | NOT_TESTED | Phase 8A で設定（`vercel.json`）まで。実際の公開はユーザーの操作待ち |
+| 本番相当のヘッダー（CSP など）で動作する | PASS | `vercel.json` と同じヘッダーで `dist` を配信し、147項目すべて成功。CSP 違反なし（外部画像の挿入が遮断されることも確認） |
+| ページの再読み込み | PASS | ルーターを使わないため常に `/`（index.html）。再読み込みでスタート画面に戻る |
+| 存在しないファイルは 404 | PASS | 本番相当の配信で確認 |
+| タイトル・description・OGP（画像以外）・favicon | PASS | Phase 8A で追加。favicon は作品専用の SVG |
+| OGP 画像 | NOT_TESTED | 未作成（公開 URL が決まってから。SUBMISSION_INVENTORY §3） |
+| 初回の読み込みサイズ | PASS | JS 約88KB・CSS 約7KB（gzip） |
+| https での実際のコピー | NOT_TESTED | 公開後に DEVICE_TEST_GUIDE で確認 |
 
 ## 2. 完成文の意味（全シナリオ）
 
@@ -158,4 +165,6 @@
 | m-3 | 確認画面のカードが縦に長い（390px 幅で約820px） | 一部改善（説明を短くした） |
 | m-4 | 文節改行（`auto-phrase`）は Chrome・Edge のみ。他のブラウザでは単語の途中で改行することがある | 未対応 |
 | m-5 | Firefox・Safari で未確認 | 未対応 |
-| m-6 | `docs/references/`（Gemini Canvas の参考資料）が Git 管理外 | 判断待ち（コミットするかは人が決める） |
+| m-6 | `docs/references/`（Gemini Canvas の参考資料）が Git 管理外 | 公開しない方針（Phase 8A で `.gitignore` に追加） |
+| m-7 | OGP 画像・apple-touch-icon がない | 未対応（公開 URL 決定後） |
+| m-8 | コミットの作者情報にメールアドレスが含まれる（公開リポジトリにすると見える） | 判断待ち（GitHub の noreply アドレスを使うかは人が決める） |

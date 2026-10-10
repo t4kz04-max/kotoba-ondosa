@@ -31,3 +31,6 @@ coverage
 .env
 .env.*
 !.env.example
+
+# Phase 4 の参考資料（外部 CDN を含む試作。公開リポジトリに含めない）
+docs/references/
