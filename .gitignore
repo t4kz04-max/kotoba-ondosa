@@ -34,3 +34,6 @@ coverage
 
 # Phase 4 の参考資料（外部 CDN を含む試作。公開リポジトリに含めない）
 docs/references/
+
+# 提出用 ZIP の出力先（scripts/make-submission-zip.mjs）
+release/
